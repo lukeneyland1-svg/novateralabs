@@ -23,6 +23,13 @@ try { db.exec("ALTER TABLE automation_tasks ADD COLUMN type TEXT NOT NULL DEFAUL
 try { db.exec("ALTER TABLE automation_tasks ADD COLUMN last_result TEXT DEFAULT ''"); } catch (e) {}
 
 db.exec(`
+  CREATE TABLE IF NOT EXISTS notified_alerts (
+    fingerprint TEXT PRIMARY KEY,
+    notified_at TEXT NOT NULL
+  )
+`);
+
+db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL UNIQUE,

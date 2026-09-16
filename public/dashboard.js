@@ -149,36 +149,43 @@ function escapeHtml(s){
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-async function fetchAlerts(){
-  try{
-    const res = await fetch('/api/security');
-    if(!res.ok) throw new Error('bad response');
-    const alerts = await res.json();
-
-    const feed = document.getElementById('alertFeed');
-    if(!alerts.length){
-      feed.innerHTML = `<div class="alert"><span class="sev-dot low"></span><span class="alert-time">—</span><span class="alert-msg">No security events recorded.</span></div>`;
-    } else {
-      feed.innerHTML = alerts.slice(0, 12).map(a => `
-        <div class="alert">
-          <span class="sev-dot ${SEV_CLASS[a.severity] || 'low'}"></span>
-          <span class="alert-time">${relativeTime(a.timestamp)}</span>
-          <span class="alert-msg"><b>${escapeHtml(a.type || 'Event')}</b> — ${escapeHtml(a.message)}${a.ip ? ` <span style="color:var(--text-dim)">(${escapeHtml(a.ip)})</span>` : ''}</span>
-        </div>
-      `).join('');
-    }
-
-    const active = alerts.filter(a => a.severity === 'critical' || a.severity === 'high').length;
-    const tag = document.getElementById('alertTag');
-    tag.textContent = active === 0 ? 'All clear' : `${active} active`;
-    tag.className = active === 0 ? 'tag' : (alerts.some(a=>a.severity==='critical') ? 'tag crit' : 'tag warn');
-  } catch(err){
-    console.error('Security fetch failed:', err);
-    document.getElementById('alertFeed').innerHTML = `<div class="alert"><span class="sev-dot crit"></span><span class="alert-time">—</span><span class="alert-msg">Couldn't reach the security feed.</span></div>`;
+function renderAlertFeed(alerts){
+  const feed = document.getElementById('alertFeed');
+  if(!alerts.length){
+    feed.innerHTML = `<div class="alert"><span class="sev-dot low"></span><span class="alert-time">—</span><span class="alert-msg">No security events recorded.</span></div>`;
+  } else {
+    feed.innerHTML = alerts.slice(0, 12).map(a => `
+      <div class="alert">
+        <span class="sev-dot ${SEV_CLASS[a.severity] || 'low'}"></span>
+        <span class="alert-time">${relativeTime(a.timestamp)}</span>
+        <span class="alert-msg"><b>${escapeHtml(a.type || 'Event')}</b> — ${escapeHtml(a.message)}${a.ip ? ` <span style="color:var(--text-dim)">(${escapeHtml(a.ip)})</span>` : ''}</span>
+      </div>
+    `).join('');
   }
+
+  const active = alerts.filter(a => a.severity === 'critical' || a.severity === 'high').length;
+  const tag = document.getElementById('alertTag');
+  tag.textContent = active === 0 ? 'All clear' : `${active} active`;
+  tag.className = active === 0 ? 'tag' : (alerts.some(a=>a.severity==='critical') ? 'tag crit' : 'tag warn');
 }
-fetchAlerts();
-setInterval(fetchAlerts, 12000);
+
+function connectAlertStream(){
+  const es = new EventSource('/api/security/stream');
+  let connected = false;
+
+  es.onmessage = (e) => {
+    connected = true;
+    renderAlertFeed(JSON.parse(e.data));
+  };
+
+  es.onerror = () => {
+    if(!connected){
+      document.getElementById('alertFeed').innerHTML = `<div class="alert"><span class="sev-dot crit"></span><span class="alert-time">—</span><span class="alert-msg">Couldn't reach the security feed.</span></div>`;
+    }
+    // EventSource auto-reconnects; `connected` resets are handled by the next onmessage.
+  };
+}
+connectAlertStream();
 
 /* ---------------- Infrastructure simulation ---------------- */
 const simCpuBtn = document.getElementById('simCpuBtn');

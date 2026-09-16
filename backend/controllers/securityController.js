@@ -1,6 +1,8 @@
 // controllers/securityController.js
 const fs   = require("fs/promises");
 const path = require("path");
+const { EventEmitter } = require("events");
+const alertNotifier = require("../services/alertNotifier");
 
 const WINDOWS_ALERTS_PATH = path.join(__dirname, "../data/windows-alerts.json");
 const LINUX_LOG_PATHS     = ["/var/log/auth.log", "/var/log/secure"];
@@ -8,6 +10,8 @@ const CACHE_TTL           = 10000; // 10 seconds
 
 let cachedAlerts = [];
 let lastRead     = 0;
+
+const alertEmitter = new EventEmitter();
 
 // ── Severity classifier for Windows event type string ────────────────────────
 function classifyWindowsType(type) {
@@ -117,7 +121,13 @@ async function refreshCache() {
 
     lastRead = Date.now();
     console.log(`[security] Refreshed — ${linux.length} Linux + ${windows.length} Windows alerts`);
+
+    alertEmitter.emit("alerts", cachedAlerts);
+    alertNotifier.checkAndNotify(cachedAlerts);
 }
+
+// Proactively refresh so alerts are picked up and pushed even with no active pollers/streams.
+setInterval(refreshCache, CACHE_TTL);
 
 // ── Route handler: GET /api/security/alerts ───────────────────────────────────
 exports.getSecurityEvents = async (req, res) => {
@@ -137,4 +147,21 @@ exports.getSecurityEvents = async (req, res) => {
         console.error("[security] API error:", err);
         res.status(500).json({ error: "Internal Server Error" });
     }
+};
+
+// ── Route handler: GET /api/security/stream ────────────────────────────────────
+exports.streamSecurityEvents = (req, res) => {
+    res.writeHead(200, {
+        "Content-Type":  "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection":    "keep-alive",
+    });
+
+    const send = (alerts) => res.write(`data: ${JSON.stringify(alerts)}\n\n`);
+    send(cachedAlerts);
+
+    const onAlerts = (alerts) => send(alerts);
+    alertEmitter.on("alerts", onAlerts);
+
+    req.on("close", () => alertEmitter.off("alerts", onAlerts));
 };
