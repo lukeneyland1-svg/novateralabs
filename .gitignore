@@ -1,0 +1,26 @@
+# Top-level leftovers from before the project was reorganized into backend/ + public/
+/assets/
+/data/
+/node_modules/
+/package.json
+/package-lock.json
+/public_backup/
+/dashboard-js-addition.txt
+
+# Backend: dependencies (regenerated via npm install, don't need to be in git)
+backend/node_modules/
+
+# Backend: secrets — these must NEVER be committed
+backend/secrets.js
+backend/ssl/
+
+# Backend: runtime data (the database itself, not source code)
+backend/data/
+
+# Backend: stray accidental folder
+backend/cd/
+
+# OS/editor artifacts
+.DS_Store
+*.log
+npm-debug.log*

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contact – NovaTeraLabs</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+  <header class="topbar">
+    <a class="brand" href="index.html">NovaTera<span>Labs</span></a>
+    <nav class="nav">
+      <a href="index.html">Home</a>
+      <a href="about.html">About</a>
+      <a href="projects.html">Projects</a>
+      <a href="dashboard.html">Dashboard</a>
+       <a href="breach-check.html">Breach Check</a>
+ <a href="contact.html" class="active">Contact</a>
+ </nav>
+    <div class="status">
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">☾</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="page-head">
+      <p class="eyebrow">CONTACT</p>
+      <h1>Get in touch with NovaTeraLabs.</h1>
+    </div>
+
+    <div class="contact-grid">
+      <div class="panel">
+        <div class="panel-head"><h2>Send a message</h2></div>
+        <p class="prose">Whether you're interested in collaboration, technical projects, or future engineering initiatives, NovaTeraLabs is always open to meaningful conversations.</p>
+
+        <form id="contactForm" style="margin-top:20px;">
+          <label style="display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);margin-bottom:14px;">
+            Name
+            <input type="text" id="cf-name" required
+              style="display:block;width:100%;margin-top:7px;background:var(--panel-alt);border:1px solid var(--line);border-radius:8px;padding:10px 11px;color:var(--text);font-family:'Inter',sans-serif;font-size:13.5px;">
+          </label>
+          <label style="display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);margin-bottom:14px;">
+            Email
+            <input type="email" id="cf-email" required
+              style="display:block;width:100%;margin-top:7px;background:var(--panel-alt);border:1px solid var(--line);border-radius:8px;padding:10px 11px;color:var(--text);font-family:'Inter',sans-serif;font-size:13.5px;">
+          </label>
+          <label style="display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);margin-bottom:14px;">
+            Message
+            <textarea id="cf-message" required rows="4"
+              style="display:block;width:100%;margin-top:7px;background:var(--panel-alt);border:1px solid var(--line);border-radius:8px;padding:10px 11px;color:var(--text);font-family:'Inter',sans-serif;font-size:13.5px;resize:vertical;"></textarea>
+          </label>
+
+          <!-- Honeypot field — invisible to real visitors, catches basic spam bots -->
+          <input type="text" id="cf-website" name="website" tabindex="-1" autocomplete="off"
+            style="position:absolute;left:-9999px;width:1px;height:1px;">
+
+          <div id="cf-status" style="display:none;font-size:12.5px;margin:-8px 0 14px;font-family:'IBM Plex Mono',monospace;"></div>
+
+          <button type="submit" class="btn primary" style="width:100%;justify-content:center;">Send message</button>
+        </form>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>Details</h2></div>
+        <dl class="meta-list no-rule">
+          <div><dt>Email</dt><dd>hello@novateralabs.com</dd></div>
+          <div><dt>Location</dt><dd>Virginia, USA</dd></div>
+          <div><dt>Availability</dt><dd style="text-align:right;max-width:220px;">Open to collaborations &amp; research</dd></div>
+        </dl>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">© 2026 NovaTeraLabs</footer>
+</div>
+
+<script src="script.js"></script>
+<script>
+document.getElementById('contactForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const form = e.target;
+  const btn = form.querySelector('button[type="submit"]');
+  const status = document.getElementById('cf-status');
+
+  const payload = {
+    name: document.getElementById('cf-name').value,
+    email: document.getElementById('cf-email').value,
+    message: document.getElementById('cf-message').value,
+    website: document.getElementById('cf-website').value,
+  };
+
+  btn.disabled = true;
+  btn.textContent = 'Sending...';
+  status.style.display = 'none';
+
+  try {
+    const res = await fetch('/api/contact', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Something went wrong.');
+
+    status.textContent = 'Message sent — thanks for reaching out! I\'ll get back to you soon.';
+    status.style.color = 'var(--accent)';
+    status.style.display = 'block';
+    form.reset();
+  } catch (err) {
+    status.textContent = err.message;
+    status.style.color = 'var(--crit)';
+    status.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Send message';
+  }
+});
+</script>
+</body>
+</html>

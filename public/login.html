@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login – NovaTeraLabs</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app" style="display:flex;align-items:center;justify-content:center;min-height:90vh;">
+  <div class="panel" style="width:100%;max-width:360px;">
+    <div class="panel-head"><h2>NovaTeraLabs</h2></div>
+    <p style="color:var(--text-muted);font-size:13.5px;margin:-8px 0 20px;">Sign in to view the dashboard.</p>
+    <form id="loginForm">
+      <label style="display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);margin-bottom:14px;">
+        Username
+        <input type="text" id="username" required style="display:block;width:100%;margin-top:7px;background:var(--panel-alt);border:1px solid var(--line);border-radius:8px;padding:10px 11px;color:var(--text);font-family:'Inter',sans-serif;font-size:13.5px;">
+      </label>
+      <label style="display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);margin-bottom:14px;">
+        Password
+        <input type="password" id="password" required style="display:block;width:100%;margin-top:7px;background:var(--panel-alt);border:1px solid var(--line);border-radius:8px;padding:10px 11px;color:var(--text);font-family:'Inter',sans-serif;font-size:13.5px;">
+      </label>
+      <div id="loginError" style="display:none;color:var(--crit);font-size:12px;margin:-8px 0 14px;font-family:'IBM Plex Mono',monospace;"></div>
+      <button type="submit" class="btn primary" style="width:100%;justify-content:center;">Sign in</button>
+    </form>
+  </div>
+</div>
+<script>
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const username = document.getElementById('username').value;
+  const password = document.getElementById('password').value;
+  const errorBox = document.getElementById('loginError');
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    if (!res.ok) throw new Error('Invalid credentials');
+    window.location.href = '/dashboard.html';
+  } catch (err) {
+    errorBox.textContent = 'Invalid username or password.';
+    errorBox.style.display = 'block';
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard – NovaTeraLabs</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+  <header class="topbar">
+    <a class="brand" href="index.html">NovaTera<span>Labs</span></a>
+    <nav class="nav">
+      <a href="index.html">Home</a>
+      <a href="about.html">About</a>
+      <a href="projects.html">Projects</a>
+      <a href="dashboard.html" class="active">Dashboard</a>
+      <a href="breach-check.html">Breach Check</a>
+      <a href="contact.html">Contact</a>
+    </nav>
+    <div class="status">
+      <span class="live-dot"></span>
+      <span class="live-label">LIVE</span>
+      <span class="clock" id="clock">00:00:00</span>
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">☾</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="page-head">
+      <p class="eyebrow">SYSTEMS DASHBOARD</p>
+      <h1>Real-time diagnostics &amp; automation control</h1>
+      <p class="sub">Live telemetry from NovaTeraLabs infrastructure — health, performance, security posture, and automated workflows, in one instrument panel.</p>
+    </div>
+
+    <section class="panel-grid">
+      <!-- System Health -->
+      <div class="panel">
+        <div class="panel-head">
+          <h2>System Health</h2>
+          <span class="tag" id="healthTag">Nominal</span>
+        </div>
+        <div class="gauge-row">
+          <div class="gauge" data-metric="cpu">
+            <svg viewBox="0 0 120 74">
+              <path class="gauge-bg" d="M10 64 A 50 50 0 1 1 110 64" fill="none" stroke-width="10"/>
+              <path class="gauge-fg" id="cpuArc" d="M10 64 A 50 50 0 1 1 110 64" fill="none" stroke-width="10"/>
+              <text x="60" y="58" text-anchor="middle" class="gauge-value" id="cpuGaugeVal">—</text>
+              <text x="60" y="70" text-anchor="middle" class="gauge-unit">%</text>
+            </svg>
+            <div class="gauge-label">CPU</div>
+          </div>
+          <div class="gauge" data-metric="ram">
+            <svg viewBox="0 0 120 74">
+              <path class="gauge-bg" d="M10 64 A 50 50 0 1 1 110 64" fill="none" stroke-width="10"/>
+              <path class="gauge-fg" id="ramArc" d="M10 64 A 50 50 0 1 1 110 64" fill="none" stroke-width="10"/>
+              <text x="60" y="58" text-anchor="middle" class="gauge-value" id="ramGaugeVal">—</text>
+              <text x="60" y="70" text-anchor="middle" class="gauge-unit">%</text>
+            </svg>
+            <div class="gauge-label">RAM</div>
+          </div>
+          <div class="gauge" data-metric="load">
+            <svg viewBox="0 0 120 74">
+              <path class="gauge-bg" d="M10 64 A 50 50 0 1 1 110 64" fill="none" stroke-width="10"/>
+              <path class="gauge-fg" id="tempArc" d="M10 64 A 50 50 0 1 1 110 64" fill="none" stroke-width="10"/>
+              <text x="60" y="58" text-anchor="middle" class="gauge-value" id="tempGaugeVal">—</text>
+              <text x="60" y="70" text-anchor="middle" class="gauge-unit">avg</text>
+            </svg>
+            <div class="gauge-label">LOAD</div>
+          </div>
+        </div>
+        <dl class="meta-list">
+          <div><dt>OS</dt><dd>NovaOS 14.2 LTS</dd></div>
+          <div><dt>Uptime</dt><dd id="uptime">—</dd></div>
+          <div><dt>Power</dt><dd id="battery">External · 100%</dd></div>
+        </dl>
+      </div>
+
+      <!-- Performance -->
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Performance</h2>
+          <span class="tag" id="perfTag">Stable</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">CPU LOAD</span>
+          <svg class="spark" viewBox="0 0 120 30" preserveAspectRatio="none">
+            <polyline id="cpuSpark" points=""/>
+          </svg>
+          <span class="metric-value" id="cpuSparkVal">—</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">RAM USAGE</span>
+          <svg class="spark" viewBox="0 0 120 30" preserveAspectRatio="none">
+            <polyline id="ramSpark" points=""/>
+          </svg>
+          <span class="metric-value" id="ramSparkVal">—</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">DISK I/O</span>
+          <svg class="spark" viewBox="0 0 120 30" preserveAspectRatio="none">
+            <polyline id="diskSpark" points=""/>
+          </svg>
+          <span class="metric-value" id="diskSparkVal">—</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Security Alerts -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Security Alerts</h2>
+        <span class="tag" id="alertTag">0 active</span>
+      </div>
+      <div class="alert-feed" id="alertFeed"></div>
+    </section>
+
+    <!-- Infrastructure Simulation -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Infrastructure Simulation</h2>
+        <span class="tag warn">Chaos testing</span>
+      </div>
+      <p class="prose" style="margin-bottom:16px;">Deliberately trigger controlled failure conditions to verify the monitoring above actually catches them. The CPU test is real and briefly loads this server; the attack test uses only synthetic data.</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+        <button class="btn primary" id="simCpuBtn">Simulate CPU load spike (10s)</button>
+        <button class="btn primary" id="simAttackBtn">Simulate brute-force attack</button>
+      </div>
+      <div id="simResult" style="display:none;"></div>
+    </section>
+
+    <!-- Automation Tasks -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Automation Tasks</h2>
+        <div class="panel-actions">
+          <button class="btn" id="refreshBtn">↻ Refresh</button>
+          <button class="btn primary" id="newAutomationBtn">+ New Automation</button>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table class="task-table">
+          <thead>
+            <tr><th>Name</th><th>Schedule</th><th>Status</th><th>Last run</th><th>Next run</th><th>Last result</th></tr>
+          </thead>
+          <tbody id="taskBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">© 2026 NovaTeraLabs</footer>
+</div>
+
+<!-- New Automation Modal -->
+<div class="modal-overlay" id="automationModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Create automation</h3>
+      <button class="modal-close" id="closeAutomationModal" aria-label="Close">×</button>
+    </div>
+    <form id="automationForm">
+      <label>Name
+        <input type="text" id="autoName" placeholder="e.g. Nightly log rotation" required>
+      </label>
+      <label>Action type
+        <select id="autoType">
+          <option value="log">Log Entry (safe, demonstrative)</option>
+          <option value="health_check">Health Check (pings novateralabs.com)</option>
+        </select>
+      </label>
+      <label>Schedule (cron — 5 fields: minute hour day month weekday)
+        <input type="text" id="autoSchedule" placeholder="0 2 * * *" required>
+      </label>
+      <div class="form-error" id="autoFormError">Something went wrong saving this automation.</div>
+      <div class="form-actions">
+        <button type="button" class="btn" id="cancelAutomation">Cancel</button>
+        <button type="submit" class="btn primary">Save automation</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Logs Modal -->
+<div class="modal-overlay" id="logsModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="logsTitle">Logs</h3>
+      <button class="modal-close" id="closeLogsModal" aria-label="Close">×</button>
+    </div>
+    <pre class="log-output" id="logOutput"></pre>
+  </div>
+</div>
+
+<script src="script.js"></script>
+<script src="dashboard.js"></script>
+</body>
+</html>

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Breach Check – NovaTeraLabs</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+  <header class="topbar">
+    <a class="brand" href="index.html">NovaTera<span>Labs</span></a>
+    <nav class="nav">
+      <a href="index.html">Home</a>
+      <a href="about.html">About</a>
+      <a href="projects.html">Projects</a>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="breach-check.html" class="active">Breach Check</a>
+      <a href="contact.html">Contact</a>
+    </nav>
+    <div class="status">
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">☾</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="page-head">
+      <p class="eyebrow">CREDENTIAL MONITORING</p>
+      <h1>Has your email been exposed in a data breach?</h1>
+      <p class="sub">Checks your email against known, publicly-documented data breaches. Nothing you enter is stored — this runs a live lookup and returns the result directly.</p>
+    </div>
+
+    <div class="panel">
+      <form id="breachForm" style="max-width:480px;">
+        <label style="display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);margin-bottom:14px;">
+          Email address
+          <input type="email" id="bc-email" required placeholder="you@example.com"
+            style="display:block;width:100%;margin-top:7px;background:var(--panel-alt);border:1px solid var(--line);border-radius:8px;padding:10px 11px;color:var(--text);font-family:'Inter',sans-serif;font-size:13.5px;">
+        </label>
+        <button type="submit" class="btn primary" id="bc-submit">Check now</button>
+      </form>
+
+      <div id="bc-result" style="margin-top:24px;display:none;"></div>
+    </div>
+  </main>
+
+  <footer class="footer">© 2026 NovaTeraLabs</footer>
+</div>
+
+<script src="script.js"></script>
+<script>
+document.getElementById('breachForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('bc-email').value;
+  const btn = document.getElementById('bc-submit');
+  const resultBox = document.getElementById('bc-result');
+
+  btn.disabled = true;
+  btn.textContent = 'Checking...';
+  resultBox.style.display = 'none';
+
+  try {
+    const res = await fetch('/api/breach-check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Something went wrong.');
+
+    if (data.found) {
+      resultBox.innerHTML = `
+        <div class="tag crit" style="margin-bottom:14px;">${data.breaches.length} breach${data.breaches.length === 1 ? '' : 'es'} found</div>
+        <p style="color:var(--text-muted);font-size:14px;line-height:1.6;margin:0 0 12px;">
+          This email appeared in the following known breaches. If you reused a password from any of these anywhere else, change it now.
+        </p>
+        <ul style="margin:0;padding-left:18px;color:var(--text);font-size:14px;line-height:1.8;">
+          ${data.breaches.map(b => `<li>${b}</li>`).join('')}
+        </ul>
+      `;
+    } else {
+      resultBox.innerHTML = `
+        <div class="tag" style="margin-bottom:14px;">No known breaches found</div>
+        <p style="color:var(--text-muted);font-size:14px;line-height:1.6;margin:0;">
+          This email doesn't appear in any breaches in the current database. That's good news, but it isn't a guarantee — check back periodically.
+        </p>
+      `;
+    }
+    resultBox.style.display = 'block';
+  } catch (err) {
+    resultBox.innerHTML = `<p style="color:var(--crit);font-size:14px;">${err.message}</p>`;
+    resultBox.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Check now';
+  }
+});
+</script>
+</body>
+</html>
