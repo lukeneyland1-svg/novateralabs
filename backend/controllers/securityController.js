@@ -3,6 +3,7 @@ const fs   = require("fs/promises");
 const path = require("path");
 const { EventEmitter } = require("events");
 const alertNotifier = require("../services/alertNotifier");
+const threatIntel = require("../services/threatIntel");
 
 const WINDOWS_ALERTS_PATH = path.join(__dirname, "../data/windows-alerts.json");
 const LINUX_LOG_PATHS     = ["/var/log/auth.log", "/var/log/secure"];
@@ -140,7 +141,8 @@ async function refreshCache() {
 
     const SEVERITY_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
 
-    cachedAlerts = [...linux, ...windows].sort((a, b) => {
+    const enriched = await threatIntel.enrichAlerts([...linux, ...windows]);
+    cachedAlerts = enriched.sort((a, b) => {
         const timeDiff = new Date(b.timestamp) - new Date(a.timestamp);
         if (timeDiff !== 0) return timeDiff;
         return (SEVERITY_ORDER[a.severity] ?? 4) - (SEVERITY_ORDER[b.severity] ?? 4);

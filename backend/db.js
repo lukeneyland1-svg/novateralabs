@@ -96,6 +96,21 @@ db.exec(`
 `);
 db.exec("CREATE INDEX IF NOT EXISTS idx_security_events_user ON security_events(user_id)");
 
+// Adds columns for threat-intel enrichment. Safe no-ops if they already exist.
+try { db.exec("ALTER TABLE security_events ADD COLUMN abuse_score INTEGER"); } catch (e) {}
+try { db.exec("ALTER TABLE security_events ADD COLUMN country_code TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE security_events ADD COLUMN is_malicious INTEGER"); } catch (e) {}
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS ip_reputation (
+    ip TEXT PRIMARY KEY,
+    abuse_score INTEGER,
+    country_code TEXT,
+    is_malicious INTEGER,
+    checked_at TEXT NOT NULL
+  )
+`);
+
 // Every account needs its own API key for the agent/data-ingestion pipeline.
 // Each row needs a distinct random value, so this can't be a single UPDATE.
 for (const user of db.prepare("SELECT id FROM users WHERE api_key IS NULL").all()) {

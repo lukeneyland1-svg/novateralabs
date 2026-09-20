@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const db = require("../db");
 const alertNotifier = require("../services/alertNotifier");
+const threatIntel = require("../services/threatIntel");
 
 exports.reportMetrics = (req, res) => {
     try {
@@ -55,15 +56,21 @@ function isValidEvent(e) {
 const replaceSecurityEvents = db.transaction((userId, events) => {
     db.prepare("DELETE FROM security_events WHERE user_id = ?").run(userId);
     const insert = db.prepare(`
-        INSERT INTO security_events (user_id, source, severity, type, message, ip, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO security_events (user_id, source, severity, type, message, ip, timestamp, abuse_score, country_code, is_malicious)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     for (const e of events) {
-        insert.run(userId, e.source, e.severity, e.type, e.message, e.ip || null, e.timestamp);
+        const rep = e.reputation;
+        insert.run(
+            userId, e.source, e.severity, e.type, e.message, e.ip || null, e.timestamp,
+            rep ? rep.abuseScore : null,
+            rep ? rep.countryCode : null,
+            rep ? (rep.isMalicious ? 1 : 0) : null
+        );
     }
 });
 
-exports.reportSecurityEvents = (req, res) => {
+exports.reportSecurityEvents = async (req, res) => {
     try {
         const { events } = req.body;
         if (!Array.isArray(events) || events.length > MAX_EVENTS_PER_REPORT) {
@@ -73,8 +80,9 @@ exports.reportSecurityEvents = (req, res) => {
             return res.status(400).json({ error: "Each event needs source, severity, type, message, and timestamp strings." });
         }
 
-        replaceSecurityEvents(req.apiUserId, events);
-        alertNotifier.checkAndNotifyAccount(req.apiUserId, events);
+        const enriched = await threatIntel.enrichAlerts(events);
+        replaceSecurityEvents(req.apiUserId, enriched);
+        alertNotifier.checkAndNotifyAccount(req.apiUserId, enriched);
 
         res.json({ success: true, count: events.length });
     } catch (err) {
@@ -86,9 +94,10 @@ exports.reportSecurityEvents = (req, res) => {
 exports.getMySecurityEvents = (req, res) => {
     try {
         const events = db.prepare(`
-            SELECT source, severity, type, message, ip, timestamp
+            SELECT source, severity, type, message, ip, timestamp,
+                   abuse_score AS abuseScore, country_code AS countryCode, is_malicious AS isMalicious
             FROM security_events WHERE user_id = ? ORDER BY timestamp DESC
-        `).all(req.session.userId);
+        `).all(req.session.userId).map(e => ({ ...e, isMalicious: !!e.isMalicious }));
 
         res.json({ events });
     } catch (err) {

@@ -124,6 +124,11 @@ async function fetchDashboard(){
 /* ---------------- Poll: /api/security ---------------- */
 const SEV_CLASS = { critical: 'crit', high: 'warn', medium: 'info', low: 'low' };
 
+function reputationBadge(isMalicious, abuseScore){
+  if(!isMalicious) return '';
+  return ` <span class="tag crit" style="padding:1px 6px;font-size:10px;">⚠ Abuse score ${abuseScore}</span>`;
+}
+
 function renderAlertFeed(alerts){
   const feed = document.getElementById('alertFeed');
   if(!alerts.length){
@@ -133,7 +138,7 @@ function renderAlertFeed(alerts){
       <div class="alert">
         <span class="sev-dot ${SEV_CLASS[a.severity] || 'low'}"></span>
         <span class="alert-time">${relativeTime(a.timestamp)}</span>
-        <span class="alert-msg"><b>${escapeHtml(a.type || 'Event')}</b> — ${escapeHtml(a.message)}${a.ip ? ` <span style="color:var(--text-dim)">(${escapeHtml(a.ip)})</span>` : ''}</span>
+        <span class="alert-msg"><b>${escapeHtml(a.type || 'Event')}</b> — ${escapeHtml(a.message)}${a.ip ? ` <span style="color:var(--text-dim)">(${escapeHtml(a.ip)})</span>` : ''}${reputationBadge(a.reputation && a.reputation.isMalicious, a.reputation && a.reputation.abuseScore)}</span>
       </div>
     `).join('');
   }
@@ -521,7 +526,7 @@ function renderMyEventsFeed(events){
     <div class="alert">
       <span class="sev-dot ${SEV_CLASS[a.severity] || 'low'}"></span>
       <span class="alert-time">${relativeTime(a.timestamp)}</span>
-      <span class="alert-msg"><b>${escapeHtml(a.type || 'Event')}</b> — ${escapeHtml(a.message)}${a.ip ? ` <span style="color:var(--text-dim)">(${escapeHtml(a.ip)})</span>` : ''}</span>
+      <span class="alert-msg"><b>${escapeHtml(a.type || 'Event')}</b> — ${escapeHtml(a.message)}${a.ip ? ` <span style="color:var(--text-dim)">(${escapeHtml(a.ip)})</span>` : ''}${reputationBadge(a.isMalicious, a.abuseScore)}</span>
     </div>
   `).join('');
 }
