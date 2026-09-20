@@ -1,3 +1,7 @@
+// securityController requires alertNotifier, which requires db.js — point it
+// at an isolated in-memory database instead of the real (gitignored) one.
+process.env.NOVATERALABS_DB_PATH = ":memory:";
+
 // Requiring securityController schedules a real background timer (to poll
 // log files every 10s) as a side effect. Capture that timer's handle so we
 // can cancel it below — otherwise the test process never exits.
