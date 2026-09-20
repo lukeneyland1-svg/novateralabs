@@ -52,7 +52,25 @@ function extractIP(str) {
 
 // ── Parse one raw syslog line ─────────────────────────────────────────────────
 // Format: "May 16 09:41:01 hostname process[pid]: message"
-function parseLinuxLine(line) { if (!line.trim()) return null; const match = line.match(/^(\S+)\s+(\S+)\s+([^:]+):\s*(.*)$/); if (!match) return null; const [, timestampRaw, , , message] = match; if (!message) return null; const parsed = new Date(timestampRaw); const timestamp = isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString(); return { source: "linux", severity: classifyLinuxLine(line), type: "Auth Log", message, ip: extractIP(message), timestamp, }; }
+function parseLinuxLine(line) {
+    if (!line.trim()) return null;
+    // The date/time token itself contains colons, so it must be captured as
+    // three whitespace-separated fields, not with a colon-excluding class.
+    const match = line.match(/^(\S+\s+\S+\s+\S+)\s+(\S+)\s+([^:]+):\s*(.*)$/);
+    if (!match) return null;
+    const [, timestampRaw, , , message] = match;
+    if (!message) return null;
+    const parsed = new Date(timestampRaw);
+    const timestamp = isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
+    return {
+        source: "linux",
+        severity: classifyLinuxLine(line),
+        type: "Auth Log",
+        message,
+        ip: extractIP(message),
+        timestamp,
+    };
+}
 // ── Read last ~8KB from Linux auth.log ────────────────────────────────────────
 async function readLinuxAlerts() {
     for (const logPath of LINUX_LOG_PATHS) {
@@ -164,4 +182,19 @@ exports.streamSecurityEvents = (req, res) => {
     alertEmitter.on("alerts", onAlerts);
 
     req.on("close", () => alertEmitter.off("alerts", onAlerts));
+};
+
+// Test-only seam: exposes the pure parsing/classification helpers plus a way
+// to inject a fake cache, so tests don't need real log files or to wait on
+// the polling timer above.
+exports._test = {
+    classifyWindowsType,
+    classifyLinuxLine,
+    extractIP,
+    parseLinuxLine,
+    alertEmitter,
+    setCache(alerts) {
+        cachedAlerts = alerts;
+        lastRead = Date.now();
+    },
 };
