@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const db = require("../db");
+const alertNotifier = require("../services/alertNotifier");
 
 exports.reportMetrics = (req, res) => {
     try {
@@ -73,6 +74,7 @@ exports.reportSecurityEvents = (req, res) => {
         }
 
         replaceSecurityEvents(req.apiUserId, events);
+        alertNotifier.checkAndNotifyAccount(req.apiUserId, events);
 
         res.json({ success: true, count: events.length });
     } catch (err) {

@@ -34,6 +34,15 @@ db.exec(`
 `);
 
 db.exec(`
+  CREATE TABLE IF NOT EXISTS account_notified_alerts (
+    user_id INTEGER NOT NULL,
+    fingerprint TEXT NOT NULL,
+    notified_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, fingerprint)
+  )
+`);
+
+db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL UNIQUE,

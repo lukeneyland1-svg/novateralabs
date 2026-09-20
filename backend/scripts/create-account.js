@@ -5,6 +5,10 @@ const db = require("../db");
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 function question(prompt, hide) {
   return new Promise((resolve) => {
     if (!hide) { rl.question(prompt, resolve); return; }
@@ -34,6 +38,7 @@ function question(prompt, hide) {
 (async () => {
   const username = await question("New username: ", false);
   const password = await question("New password: ", true);
+  const email = await question("Email (used for password resets and security alerts): ", false);
   rl.close();
 
   const existing = db.prepare("SELECT id FROM users WHERE username = ?").get(username);
@@ -41,10 +46,14 @@ function question(prompt, hide) {
     console.log("That username is already taken.");
     process.exit(1);
   }
+  if (!isValidEmail(email)) {
+    console.log("That doesn't look like a valid email address.");
+    process.exit(1);
+  }
 
   const hash = bcrypt.hashSync(password, 10);
   const apiKey = crypto.randomBytes(24).toString("hex");
-  db.prepare("INSERT INTO users (username, password_hash, is_owner, api_key) VALUES (?, ?, 0, ?)").run(username, hash, apiKey);
+  db.prepare("INSERT INTO users (username, password_hash, email, is_owner, api_key) VALUES (?, ?, ?, 0, ?)").run(username, hash, email, apiKey);
   console.log(`Account "${username}" created.`);
   console.log(`API key (for connecting a server via the agent script): ${apiKey}`);
   process.exit(0);

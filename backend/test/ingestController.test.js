@@ -1,4 +1,6 @@
 process.env.NOVATERALABS_DB_PATH = ":memory:";
+process.env.EMAIL_USER = "novateralabs.test@example.com";
+process.env.EMAIL_PASS = "test-pass";
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
@@ -6,6 +8,7 @@ const bcrypt = require("bcryptjs");
 
 const db = require("../db");
 const ingestController = require("../controllers/ingestController");
+const mailer = require("../services/mailer");
 const { mockReq, mockRes } = require("../test-helpers/mockExpress");
 
 const userAId = db.prepare("INSERT INTO users (username, password_hash, api_key) VALUES (?, ?, ?)")
@@ -177,4 +180,23 @@ test("getMySecurityEvents returns the current account's events and never another
     ingestController.getMySecurityEvents(reqB, resB);
 
     assert.deepEqual(resB.body.events, []);
+});
+
+test("reportSecurityEvents emails the reporting account's own address for a critical event", async () => {
+    const emailedId = db.prepare("INSERT INTO users (username, password_hash, api_key, email) VALUES (?, ?, ?, ?)")
+        .run("account-c", bcrypt.hashSync("password789", 10), "key-c", "customer-c@example.com").lastInsertRowid;
+
+    let sentWith = null;
+    const originalSendMail = mailer.transporter.sendMail;
+    mailer.transporter.sendMail = async (opts) => { sentWith = opts; };
+
+    const req = mockReq({ body: { events: [event({ message: "Failed password for root", timestamp: "2026-02-01T00:00:00.000Z" })] } });
+    req.apiUserId = emailedId;
+    ingestController.reportSecurityEvents(req, mockRes());
+
+    assert.ok(sentWith, "expected an email to have been sent");
+    assert.equal(sentWith.to, "customer-c@example.com");
+    assert.match(sentWith.text, /Failed password for root/);
+
+    mailer.transporter.sendMail = originalSendMail;
 });

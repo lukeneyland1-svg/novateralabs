@@ -100,3 +100,78 @@ test("prunes notified fingerprints older than 7 days", async () => {
     const fingerprints = db.prepare("SELECT fingerprint FROM notified_alerts").all().map(r => r.fingerprint);
     assert.ok(!fingerprints.includes("stale-fingerprint"));
 });
+
+// ---- checkAndNotifyAccount (per-account version) ----
+
+const noEmailUserId = db.prepare("INSERT INTO users (username, password_hash) VALUES (?, ?)")
+    .run("no-email-account", "hash").lastInsertRowid;
+const accountAId = db.prepare("INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)")
+    .run("account-a", "hash", "account-a@example.com").lastInsertRowid;
+const accountBId = db.prepare("INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)")
+    .run("account-b", "hash", "account-b@example.com").lastInsertRowid;
+
+test("checkAndNotifyAccount skips sending when the account has no email on file", async () => {
+    let called = false;
+    fakeSendMail(async () => { called = true; });
+
+    await alertNotifier.checkAndNotifyAccount(noEmailUserId, [alert({ message: "no email on file" })]);
+
+    assert.equal(called, false);
+});
+
+test("checkAndNotifyAccount emails the account's own address, not EMAIL_USER", async () => {
+    let sentWith = null;
+    fakeSendMail(async (opts) => { sentWith = opts; });
+
+    await alertNotifier.checkAndNotifyAccount(accountAId, [alert({ message: "account A's own alert" })]);
+
+    assert.ok(sentWith);
+    assert.equal(sentWith.to, "account-a@example.com");
+    assert.match(sentWith.text, /account A's own alert/);
+});
+
+test("checkAndNotifyAccount does not re-notify the same account for an already-seen fingerprint", async () => {
+    let called = false;
+    fakeSendMail(async () => { called = true; });
+
+    // Same fields as the previous test => same fingerprint for this account.
+    await alertNotifier.checkAndNotifyAccount(accountAId, [alert({ message: "account A's own alert" })]);
+
+    assert.equal(called, false);
+});
+
+test("checkAndNotifyAccount keeps separate accounts fully isolated from each other", async () => {
+    // Account B has never been notified before, and shares no state with
+    // account A above — it must still get its own alert even though A's
+    // identical-looking alert was already sent and deduped moments ago.
+    let sentWith = null;
+    fakeSendMail(async (opts) => { sentWith = opts; });
+
+    await alertNotifier.checkAndNotifyAccount(accountBId, [alert({ message: "account A's own alert" })]);
+
+    assert.ok(sentWith);
+    assert.equal(sentWith.to, "account-b@example.com");
+});
+
+test("checkAndNotifyAccount rate-limits repeated sends per account within the cooldown", async () => {
+    let called = false;
+    fakeSendMail(async () => { called = true; });
+
+    // A fresh, distinct alert for account A — not yet notified — but A already
+    // sent within the last 5 minutes (the test above), so this must be skipped.
+    await alertNotifier.checkAndNotifyAccount(accountAId, [alert({ message: "a brand new alert for A", timestamp: "2026-01-01T00:10:00.000Z" })]);
+
+    assert.equal(called, false);
+});
+
+test("checkAndNotifyAccount prunes fingerprints older than 7 days for that account", async () => {
+    const oldDate = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
+    db.prepare("INSERT OR IGNORE INTO account_notified_alerts (user_id, fingerprint, notified_at) VALUES (?, ?, ?)")
+        .run(accountAId, "stale-account-fingerprint", oldDate);
+
+    fakeSendMail(async () => {});
+    await alertNotifier.checkAndNotifyAccount(accountAId, []);
+
+    const fingerprints = db.prepare("SELECT fingerprint FROM account_notified_alerts WHERE user_id = ?").all(accountAId).map(r => r.fingerprint);
+    assert.ok(!fingerprints.includes("stale-account-fingerprint"));
+});
