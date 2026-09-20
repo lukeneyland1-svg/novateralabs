@@ -48,15 +48,6 @@ function pushHistory(k, value){
   if(history[k].length > HIST_LEN) history[k].shift();
 }
 
-function sparkPoints(arr){
-  const w = 120, h = 30, max = 100;
-  return arr.map((v,i) => {
-    const x = (i/(HIST_LEN-1)) * w;
-    const y = h - (Math.min(100,Math.max(0,v))/max) * h;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(' ');
-}
-
 function updatePerfTag(cpu, ram, disk){
   const worst = Math.max(cpu, ram, disk);
   const tag = document.getElementById('perfTag');
@@ -115,9 +106,9 @@ async function fetchDashboard(){
     pushHistory('cpu', cpu);
     pushHistory('ram', ram);
     pushHistory('disk', diskPct);
-    document.getElementById('cpuSpark').setAttribute('points', sparkPoints(history.cpu));
-    document.getElementById('ramSpark').setAttribute('points', sparkPoints(history.ram));
-    document.getElementById('diskSpark').setAttribute('points', sparkPoints(history.disk));
+    document.getElementById('cpuSpark').setAttribute('points', sparkPoints(history.cpu, HIST_LEN));
+    document.getElementById('ramSpark').setAttribute('points', sparkPoints(history.ram, HIST_LEN));
+    document.getElementById('diskSpark').setAttribute('points', sparkPoints(history.disk, HIST_LEN));
     document.getElementById('cpuSparkVal').textContent = Math.round(cpu)+'%';
     document.getElementById('ramSparkVal').textContent = Math.round(ram)+'%';
     document.getElementById('diskSparkVal').textContent = Math.round(diskPct)+'%';
@@ -134,20 +125,6 @@ setInterval(fetchDashboard, 4000);
 
 /* ---------------- Poll: /api/security ---------------- */
 const SEV_CLASS = { critical: 'crit', high: 'warn', medium: 'info', low: 'low' };
-
-function relativeTime(iso){
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const mins = Math.round(diffMs / 60000);
-  if(mins < 1) return 'just now';
-  if(mins < 60) return `${mins}m ago`;
-  const hrs = Math.round(mins/60);
-  if(hrs < 24) return `${hrs}h ago`;
-  return `${Math.round(hrs/24)}d ago`;
-}
-
-function escapeHtml(s){
-  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
 
 function renderAlertFeed(alerts){
   const feed = document.getElementById('alertFeed');
@@ -191,20 +168,6 @@ connectAlertStream();
 const simCpuBtn = document.getElementById('simCpuBtn');
 const simAttackBtn = document.getElementById('simAttackBtn');
 const simResult = document.getElementById('simResult');
-
-function renderAttackChart(buckets){
-  const width = 300, height = 50;
-  const max = Math.max(...buckets, 1);
-  const barGap = 2;
-  const barWidth = (width / buckets.length) - barGap;
-  const bars = buckets.map((v, i) => {
-    const barHeight = (v / max) * height;
-    const x = i * (width / buckets.length);
-    const y = height - barHeight;
-    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barWidth.toFixed(1)}" height="${barHeight.toFixed(1)}" fill="var(--crit)" opacity="0.85" rx="2"/>`;
-  }).join('');
-  return `<svg viewBox="0 0 ${width} ${height}" style="width:100%;height:50px;display:block;margin:10px 0;">${bars}</svg>`;
-}
 
 if(simCpuBtn){
   simCpuBtn.addEventListener('click', async () => {
@@ -272,23 +235,6 @@ if(simAttackBtn){
 
 /* ---------------- Automation tasks ---------------- */
 let tasks = [];
-
-function statusPill(status){
-  const s = (status || '').toLowerCase();
-  if(s === 'running' || s === 'success') return 'success';
-  if(s === 'failed' || s === 'error') return 'failed';
-  return 'paused';
-}
-
-function formatDateTime(iso){
-  if(!iso || iso === '—') return '—';
-  const d = new Date(iso);
-  if(isNaN(d.getTime())) return iso;
-  return d.toLocaleString(undefined, {
-    month: 'short', day: 'numeric',
-    hour: 'numeric', minute: '2-digit'
-  });
-}
 
 function renderTasks(){
   const body = document.getElementById('taskBody');
