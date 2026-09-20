@@ -1,5 +1,9 @@
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 const db = require("../db");
+const { transporter, EMAIL_USER } = require("../services/mailer");
+
+const RESET_TOKEN_TTL_MS = 30 * 60 * 1000;
 
 exports.login = (req, res) => {
     try {
@@ -39,5 +43,67 @@ exports.checkSession = (req, res) => {
         res.json({ authenticated: true, username: req.session.username });
     } else {
         res.status(401).json({ authenticated: false });
+    }
+};
+
+// Always responds the same way whether or not the email matches an account,
+// so this endpoint can't be used to discover which emails have accounts.
+const GENERIC_RESET_RESPONSE = { success: true, message: "If that email matches an account, a reset link has been sent." };
+
+exports.requestPasswordReset = async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) {
+            return res.status(400).json({ error: "email is required" });
+        }
+
+        const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
+        if (!user) {
+            return res.json(GENERIC_RESET_RESPONSE);
+        }
+
+        const token = crypto.randomBytes(32).toString("hex");
+        const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS).toISOString();
+        db.prepare("INSERT INTO password_resets (token, user_id, expires_at) VALUES (?, ?, ?)")
+            .run(token, user.id, expiresAt);
+
+        const resetUrl = `https://novateralabs.com/reset-password.html?token=${token}`;
+        await transporter.sendMail({
+            from: `"NovaTeraLabs Security" <${EMAIL_USER}>`,
+            to: email,
+            subject: "Reset your NovaTeraLabs password",
+            text: `A password reset was requested for your account.\n\nReset your password: ${resetUrl}\n\nThis link expires in 30 minutes. If you didn't request this, you can ignore this email.`,
+        });
+
+        res.json(GENERIC_RESET_RESPONSE);
+    } catch (err) {
+        console.error("Password reset request error:", err);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+
+exports.resetPassword = (req, res) => {
+    try {
+        const { token, password } = req.body;
+        if (!token || !password) {
+            return res.status(400).json({ error: "token and password are required" });
+        }
+        if (password.length < 8) {
+            return res.status(400).json({ error: "Password must be at least 8 characters." });
+        }
+
+        const reset = db.prepare("SELECT * FROM password_resets WHERE token = ?").get(token);
+        if (!reset || reset.used || new Date(reset.expires_at).getTime() < Date.now()) {
+            return res.status(400).json({ error: "This reset link is invalid or has expired." });
+        }
+
+        const hash = bcrypt.hashSync(password, 10);
+        db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(hash, reset.user_id);
+        db.prepare("UPDATE password_resets SET used = 1 WHERE user_id = ?").run(reset.user_id);
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error("Password reset error:", err);
+        res.status(500).json({ error: "Internal Server Error" });
     }
 };

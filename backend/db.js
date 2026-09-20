@@ -38,6 +38,19 @@ db.exec(`
   )
 `);
 
+// Adds the column needed for password reset. Safe no-op if it already
+// exists (same pattern as the automation_tasks migration above).
+try { db.exec("ALTER TABLE users ADD COLUMN email TEXT"); } catch (e) {}
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS password_resets (
+    token TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    expires_at TEXT NOT NULL,
+    used INTEGER NOT NULL DEFAULT 0
+  )
+`);
+
 const taskCount = db.prepare("SELECT COUNT(*) AS c FROM automation_tasks").get().c;
 if (taskCount === 0) {
   const seed = db.prepare(`
