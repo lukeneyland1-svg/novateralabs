@@ -98,3 +98,83 @@ test("getApiKey returns the current account's key", () => {
     const expected = db.prepare("SELECT api_key FROM users WHERE id = ?").get(userAId).api_key;
     assert.deepEqual(res.body, { apiKey: expected });
 });
+
+function event(overrides = {}) {
+    return {
+        source: "linux",
+        severity: "critical",
+        type: "Auth Log",
+        message: "Failed password for root",
+        ip: "10.0.0.1",
+        timestamp: "2026-01-01T00:00:00.000Z",
+        ...overrides,
+    };
+}
+
+test("reportSecurityEvents rejects a non-array body", () => {
+    const req = mockReq({ body: { events: "not-an-array" } });
+    req.apiUserId = userAId;
+    const res = mockRes();
+
+    ingestController.reportSecurityEvents(req, res);
+
+    assert.equal(res.statusCode, 400);
+});
+
+test("reportSecurityEvents rejects a malformed event", () => {
+    const req = mockReq({ body: { events: [{ source: "linux", severity: "critical" }] } });
+    req.apiUserId = userAId;
+    const res = mockRes();
+
+    ingestController.reportSecurityEvents(req, res);
+
+    assert.equal(res.statusCode, 400);
+});
+
+test("reportSecurityEvents rejects an oversized batch", () => {
+    const req = mockReq({ body: { events: Array.from({ length: 201 }, () => event()) } });
+    req.apiUserId = userAId;
+    const res = mockRes();
+
+    ingestController.reportSecurityEvents(req, res);
+
+    assert.equal(res.statusCode, 400);
+});
+
+test("reportSecurityEvents stores a valid batch", () => {
+    const req = mockReq({ body: { events: [event({ message: "first" }), event({ message: "second" })] } });
+    req.apiUserId = userAId;
+    const res = mockRes();
+
+    ingestController.reportSecurityEvents(req, res);
+
+    assert.deepEqual(res.body, { success: true, count: 2 });
+    const rows = db.prepare("SELECT * FROM security_events WHERE user_id = ?").all(userAId);
+    assert.equal(rows.length, 2);
+});
+
+test("reportSecurityEvents replaces the previous batch instead of appending to it", () => {
+    const req = mockReq({ body: { events: [event({ message: "only this one now" })] } });
+    req.apiUserId = userAId;
+    ingestController.reportSecurityEvents(req, mockRes());
+
+    const rows = db.prepare("SELECT message FROM security_events WHERE user_id = ?").all(userAId);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].message, "only this one now");
+});
+
+test("getMySecurityEvents returns the current account's events and never another account's", () => {
+    // account-a has one event from the test above; account-b has none.
+    const reqA = mockReq({ session: { userId: userAId } });
+    const resA = mockRes();
+    ingestController.getMySecurityEvents(reqA, resA);
+
+    assert.equal(resA.body.events.length, 1);
+    assert.equal(resA.body.events[0].message, "only this one now");
+
+    const reqB = mockReq({ session: { userId: userBId } });
+    const resB = mockRes();
+    ingestController.getMySecurityEvents(reqB, resB);
+
+    assert.deepEqual(resB.body.events, []);
+});

@@ -51,13 +51,22 @@ function extractIP(str) {
 }
 
 // ── Parse one raw syslog line ─────────────────────────────────────────────────
-// Format: "May 16 09:41:01 hostname process[pid]: message"
+// Handles two real-world formats:
+//   Classic BSD syslog:  "May 16 09:41:01 hostname process[pid]: message"
+//   Modern rsyslog ISO:  "2026-09-20T00:40:48.930428+00:00 hostname process[pid]: message"
+// The ISO form has its whole timestamp in a single whitespace-free token, so
+// it's tried first; if that token isn't a parseable date, fall back to the
+// three-field classic form (whose date/time token contains colons, so it
+// can't be captured with a colon-excluding class like the message can).
 function parseLinuxLine(line) {
     if (!line.trim()) return null;
-    // The date/time token itself contains colons, so it must be captured as
-    // three whitespace-separated fields, not with a colon-excluding class.
-    const match = line.match(/^(\S+\s+\S+\s+\S+)\s+(\S+)\s+([^:]+):\s*(.*)$/);
+
+    let match = line.match(/^(\S+)\s+(\S+)\s+([^:]+):\s*(.*)$/);
+    if (match && isNaN(new Date(match[1]).getTime())) {
+        match = line.match(/^(\S+\s+\S+\s+\S+)\s+(\S+)\s+([^:]+):\s*(.*)$/);
+    }
     if (!match) return null;
+
     const [, timestampRaw, , , message] = match;
     if (!message) return null;
     const parsed = new Date(timestampRaw);

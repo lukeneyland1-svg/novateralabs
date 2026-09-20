@@ -70,6 +70,20 @@ db.exec(`
   )
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS security_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    source TEXT NOT NULL,
+    severity TEXT NOT NULL,
+    type TEXT NOT NULL,
+    message TEXT NOT NULL,
+    ip TEXT,
+    timestamp TEXT NOT NULL
+  )
+`);
+db.exec("CREATE INDEX IF NOT EXISTS idx_security_events_user ON security_events(user_id)");
+
 // Every account needs its own API key for the agent/data-ingestion pipeline.
 // Each row needs a distinct random value, so this can't be a single UPDATE.
 for (const user of db.prepare("SELECT id FROM users WHERE api_key IS NULL").all()) {

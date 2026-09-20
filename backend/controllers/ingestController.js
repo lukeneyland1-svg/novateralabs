@@ -43,6 +43,58 @@ exports.getMyMetrics = (req, res) => {
     }
 };
 
+const MAX_EVENTS_PER_REPORT = 200;
+
+function isValidEvent(e) {
+    return e && typeof e.source === "string" && typeof e.severity === "string" &&
+        typeof e.type === "string" && typeof e.message === "string" &&
+        typeof e.timestamp === "string" && (e.ip === null || e.ip === undefined || typeof e.ip === "string");
+}
+
+const replaceSecurityEvents = db.transaction((userId, events) => {
+    db.prepare("DELETE FROM security_events WHERE user_id = ?").run(userId);
+    const insert = db.prepare(`
+        INSERT INTO security_events (user_id, source, severity, type, message, ip, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+    for (const e of events) {
+        insert.run(userId, e.source, e.severity, e.type, e.message, e.ip || null, e.timestamp);
+    }
+});
+
+exports.reportSecurityEvents = (req, res) => {
+    try {
+        const { events } = req.body;
+        if (!Array.isArray(events) || events.length > MAX_EVENTS_PER_REPORT) {
+            return res.status(400).json({ error: `events must be an array of at most ${MAX_EVENTS_PER_REPORT} items.` });
+        }
+        if (!events.every(isValidEvent)) {
+            return res.status(400).json({ error: "Each event needs source, severity, type, message, and timestamp strings." });
+        }
+
+        replaceSecurityEvents(req.apiUserId, events);
+
+        res.json({ success: true, count: events.length });
+    } catch (err) {
+        console.error("Security events ingest error:", err);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+
+exports.getMySecurityEvents = (req, res) => {
+    try {
+        const events = db.prepare(`
+            SELECT source, severity, type, message, ip, timestamp
+            FROM security_events WHERE user_id = ? ORDER BY timestamp DESC
+        `).all(req.session.userId);
+
+        res.json({ events });
+    } catch (err) {
+        console.error("Security events read error:", err);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+
 exports.getApiKey = (req, res) => {
     const user = db.prepare("SELECT api_key FROM users WHERE id = ?").get(req.session.userId);
     res.json({ apiKey: user.api_key });

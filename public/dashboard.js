@@ -466,5 +466,35 @@ async function fetchMyMetrics(){
     console.error('Metrics fetch failed:', err);
   }
 }
-fetchMyMetrics();
-setInterval(fetchMyMetrics, 15000);
+
+function renderMyEventsFeed(events){
+  const feed = document.getElementById('ingestEventsFeed');
+  if(!events.length){
+    feed.innerHTML = `<div class="alert"><span class="sev-dot low"></span><span class="alert-time">—</span><span class="alert-msg">No security events reported yet.</span></div>`;
+    return;
+  }
+  feed.innerHTML = events.slice(0, 12).map(a => `
+    <div class="alert">
+      <span class="sev-dot ${SEV_CLASS[a.severity] || 'low'}"></span>
+      <span class="alert-time">${relativeTime(a.timestamp)}</span>
+      <span class="alert-msg"><b>${escapeHtml(a.type || 'Event')}</b> — ${escapeHtml(a.message)}${a.ip ? ` <span style="color:var(--text-dim)">(${escapeHtml(a.ip)})</span>` : ''}</span>
+    </div>
+  `).join('');
+}
+
+async function fetchMySecurityEvents(){
+  try{
+    const res = await fetch('/api/ingest/security-events/mine');
+    const data = await res.json();
+    renderMyEventsFeed(data.events || []);
+  } catch(err){
+    console.error('Security events fetch failed:', err);
+  }
+}
+
+function pollIngestData(){
+  fetchMyMetrics();
+  fetchMySecurityEvents();
+}
+pollIngestData();
+setInterval(pollIngestData, 15000);

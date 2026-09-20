@@ -79,6 +79,19 @@ test("parseLinuxLine splits date, message, and IP out of a real auth.log line", 
     assert.equal(parsed.timestamp, new Date("May 16 09:41:01").toISOString());
 });
 
+test("parseLinuxLine also handles modern rsyslog ISO timestamps", () => {
+    // This is the real format found in /var/log/auth.log on current
+    // Debian/Ubuntu systems — distinct from the classic three-field BSD
+    // syslog format above, and caught by manually testing against a real log.
+    const line = "2026-09-20T00:40:48.930428+00:00 host sshd-session[447279]: Invalid user nico from 152.228.143.237 port 57266";
+    const parsed = parseLinuxLine(line);
+
+    assert.equal(parsed.message, "Invalid user nico from 152.228.143.237 port 57266");
+    assert.equal(parsed.ip, "152.228.143.237");
+    assert.equal(parsed.severity, "critical");
+    assert.equal(parsed.timestamp, new Date("2026-09-20T00:40:48.930428+00:00").toISOString());
+});
+
 test("parseLinuxLine returns null for a blank line", () => {
     assert.equal(parseLinuxLine("   "), null);
 });
