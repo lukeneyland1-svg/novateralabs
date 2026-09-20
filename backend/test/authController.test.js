@@ -1,0 +1,81 @@
+process.env.NOVATERALABS_DB_PATH = ":memory:";
+
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const bcrypt = require("bcryptjs");
+
+const db = require("../db");
+const authController = require("../controllers/authController");
+const { mockReq, mockRes } = require("../test-helpers/mockExpress");
+
+db.prepare("INSERT INTO users (username, password_hash) VALUES (?, ?)")
+    .run("admin", bcrypt.hashSync("correct-horse", 10));
+
+test("login rejects a request missing username or password", () => {
+    const req = mockReq({ body: { username: "admin" } });
+    const res = mockRes();
+
+    authController.login(req, res);
+
+    assert.equal(res.statusCode, 400);
+});
+
+test("login rejects an unknown username", () => {
+    const req = mockReq({ body: { username: "nobody", password: "whatever" }, session: {} });
+    const res = mockRes();
+
+    authController.login(req, res);
+
+    assert.equal(res.statusCode, 401);
+    assert.deepEqual(res.body, { error: "Invalid username or password" });
+});
+
+test("login rejects the wrong password", () => {
+    const req = mockReq({ body: { username: "admin", password: "wrong-password" }, session: {} });
+    const res = mockRes();
+
+    authController.login(req, res);
+
+    assert.equal(res.statusCode, 401);
+});
+
+test("login succeeds with the right credentials and starts a session", () => {
+    const session = {};
+    const req = mockReq({ body: { username: "admin", password: "correct-horse" }, session });
+    const res = mockRes();
+
+    authController.login(req, res);
+
+    assert.deepEqual(res.body, { success: true, username: "admin" });
+    assert.equal(session.userId, db.prepare("SELECT id FROM users WHERE username = 'admin'").get().id);
+    assert.equal(session.username, "admin");
+});
+
+test("logout destroys the session and clears the cookie", () => {
+    const req = mockReq({ session: {} });
+    const res = mockRes();
+
+    authController.logout(req, res);
+
+    assert.equal(res.clearedCookie, "connect.sid");
+    assert.deepEqual(res.body, { success: true });
+});
+
+test("checkSession reports authenticated when a session has a userId", () => {
+    const req = mockReq({ session: { userId: 1, username: "admin" } });
+    const res = mockRes();
+
+    authController.checkSession(req, res);
+
+    assert.deepEqual(res.body, { authenticated: true, username: "admin" });
+});
+
+test("checkSession reports unauthenticated with no session", () => {
+    const req = mockReq({ session: null });
+    const res = mockRes();
+
+    authController.checkSession(req, res);
+
+    assert.equal(res.statusCode, 401);
+    assert.deepEqual(res.body, { authenticated: false });
+});
