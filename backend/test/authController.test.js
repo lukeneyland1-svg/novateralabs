@@ -9,7 +9,7 @@ const db = require("../db");
 const authController = require("../controllers/authController");
 const { mockReq, mockRes } = require("../test-helpers/mockExpress");
 
-db.prepare("INSERT INTO users (username, password_hash) VALUES (?, ?)")
+db.prepare("INSERT INTO users (username, password_hash, is_owner) VALUES (?, ?, 1)")
     .run("admin", bcrypt.hashSync("correct-horse", 10));
 
 const mfaSecret = generateSecret();
@@ -60,6 +60,7 @@ test("login succeeds with the right credentials and starts a session", () => {
     assert.deepEqual(res.body, { success: true, username: "admin" });
     assert.equal(session.userId, db.prepare("SELECT id FROM users WHERE username = 'admin'").get().id);
     assert.equal(session.username, "admin");
+    assert.equal(session.isOwner, true);
 });
 
 test("login responds mfaRequired for an MFA-enabled account instead of starting a full session", () => {
@@ -103,6 +104,9 @@ test("verifyMfaLogin promotes the session on a correct TOTP code", async () => {
     assert.deepEqual(res.body, { success: true, username: "mfa-admin" });
     assert.equal(session.userId, mfaUserId);
     assert.equal(session.pendingMfaUserId, undefined);
+    // mfa-admin was created without is_owner set, so it defaults to a
+    // regular (non-owner) provisioned account.
+    assert.equal(session.isOwner, false);
 });
 
 test("verifyMfaLogin accepts a valid backup code and burns it after one use", async () => {
@@ -128,12 +132,12 @@ test("logout destroys the session and clears the cookie", () => {
 });
 
 test("checkSession reports authenticated when a session has a userId", () => {
-    const req = mockReq({ session: { userId: 1, username: "admin" } });
+    const req = mockReq({ session: { userId: 1, username: "admin", isOwner: true } });
     const res = mockRes();
 
     authController.checkSession(req, res);
 
-    assert.deepEqual(res.body, { authenticated: true, username: "admin", mfaEnabled: false });
+    assert.deepEqual(res.body, { authenticated: true, username: "admin", mfaEnabled: false, isOwner: true });
 });
 
 test("checkSession reports unauthenticated with no session", () => {

@@ -7,8 +7,9 @@ exports.getAutomationTasks = (req, res) => {
         const rows = db.prepare(`
             SELECT id, name, schedule, type, status, last_run AS lastRun, next_run AS nextRun, last_result AS lastResult
             FROM automation_tasks
+            WHERE user_id = ?
             ORDER BY id DESC
-        `).all();
+        `).all(req.session.userId);
         res.json({ tasks: rows });
     } catch (err) {
         console.error("Automation API error:", err);
@@ -30,9 +31,9 @@ exports.createAutomationTask = (req, res) => {
         const taskType = type === "health_check" ? "health_check" : "log";
 
         const result = db.prepare(`
-            INSERT INTO automation_tasks (name, schedule, type, status, last_run, next_run)
-            VALUES (?, ?, ?, 'Idle', '—', '—')
-        `).run(name, schedule, taskType);
+            INSERT INTO automation_tasks (name, schedule, type, status, last_run, next_run, user_id)
+            VALUES (?, ?, ?, 'Idle', '—', '—', ?)
+        `).run(name, schedule, taskType, req.session.userId);
 
         const task = db.prepare(`
             SELECT id, name, schedule, type, status, last_run AS lastRun, next_run AS nextRun, last_result AS lastResult

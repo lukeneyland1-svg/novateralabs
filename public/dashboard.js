@@ -120,8 +120,6 @@ async function fetchDashboard(){
     setOffline();
   }
 }
-fetchDashboard();
-setInterval(fetchDashboard, 4000);
 
 /* ---------------- Poll: /api/security ---------------- */
 const SEV_CLASS = { critical: 'crit', high: 'warn', medium: 'info', low: 'low' };
@@ -162,7 +160,6 @@ function connectAlertStream(){
     // EventSource auto-reconnects; `connected` resets are handled by the next onmessage.
   };
 }
-connectAlertStream();
 
 /* ---------------- Infrastructure simulation ---------------- */
 const simCpuBtn = document.getElementById('simCpuBtn');
@@ -341,16 +338,30 @@ function renderMfaStatus(enabled){
   mfaDisableBtn.style.display = enabled ? 'inline-flex' : 'none';
 }
 
-async function fetchMfaStatus(){
+function applyOwnerVisibility(isOwner){
+  if(isOwner) return;
+  // These panels (system stats, security log, infra simulation) read this one
+  // server's own data — not meaningful yet for a non-owner account. See
+  // requireOwner middleware on the backend for the matching API-level gate.
+  document.querySelectorAll('.owner-only').forEach(el => { el.style.display = 'none'; });
+}
+
+async function initSession(){
   try{
     const res = await fetch('/api/auth/session');
     const data = await res.json();
     renderMfaStatus(!!data.mfaEnabled);
+    applyOwnerVisibility(!!data.isOwner);
+    if(data.isOwner){
+      fetchDashboard();
+      setInterval(fetchDashboard, 4000);
+      connectAlertStream();
+    }
   } catch(err){
     mfaStatusTag.textContent = 'Unknown';
   }
 }
-fetchMfaStatus();
+initSession();
 
 mfaEnableBtn.addEventListener('click', async () => {
   mfaError.style.display = 'none';

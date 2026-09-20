@@ -17,6 +17,7 @@ const simulationRoutes = require('./server/routes/simulation');
 
 const requireAuth = require('./middleware/requireAuth');
 const requireAuthPage = require('./middleware/requireAuthPage');
+const requireOwner = require('./middleware/requireOwner');
 const scheduler = require('./scheduler');
 
 const app = express();
@@ -43,10 +44,10 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use('/api/auth', authRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/breach-check', breachRoutes);
-app.use('/api/dashboard', requireAuth, dashboardRoutes);
-app.use('/api/security', requireAuth, securityRoutes);
+app.use('/api/dashboard', requireAuth, requireOwner, dashboardRoutes);
+app.use('/api/security', requireAuth, requireOwner, securityRoutes);
 app.use('/api/automation', requireAuth, automationRoutes);
-app.use('/api/simulation', requireAuth, simulationRoutes);
+app.use('/api/simulation', requireAuth, requireOwner, simulationRoutes);
 
 scheduler.loadAndScheduleAll();
 

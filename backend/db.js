@@ -21,6 +21,9 @@ db.exec(`
 // (this lets the same file work whether the table is brand new or already had data).
 try { db.exec("ALTER TABLE automation_tasks ADD COLUMN type TEXT NOT NULL DEFAULT 'log'"); } catch (e) {}
 try { db.exec("ALTER TABLE automation_tasks ADD COLUMN last_result TEXT DEFAULT ''"); } catch (e) {}
+// Nullable: on a brand-new install this table is seeded before any user
+// account exists, so ownership gets backfilled below once an owner exists.
+try { db.exec("ALTER TABLE automation_tasks ADD COLUMN user_id INTEGER"); } catch (e) {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS notified_alerts (
@@ -44,6 +47,7 @@ try { db.exec("ALTER TABLE users ADD COLUMN email TEXT"); } catch (e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN totp_secret TEXT"); } catch (e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0"); } catch (e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN backup_codes TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN is_owner INTEGER NOT NULL DEFAULT 0"); } catch (e) {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS password_resets (
@@ -53,6 +57,13 @@ db.exec(`
     used INTEGER NOT NULL DEFAULT 0
   )
 `);
+
+// The very first account ever created becomes the owner (idempotent — a
+// no-op once an owner is already set). Then attribute any ownerless
+// automation tasks (e.g. the demo tasks seeded below, which run before any
+// user account exists on a brand-new install) to that owner.
+db.prepare("UPDATE users SET is_owner = 1 WHERE id = (SELECT MIN(id) FROM users) AND is_owner = 0").run();
+db.prepare("UPDATE automation_tasks SET user_id = (SELECT MIN(id) FROM users) WHERE user_id IS NULL").run();
 
 const taskCount = db.prepare("SELECT COUNT(*) AS c FROM automation_tasks").get().c;
 if (taskCount === 0) {

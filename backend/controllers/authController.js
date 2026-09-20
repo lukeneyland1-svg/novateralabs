@@ -30,6 +30,7 @@ exports.login = (req, res) => {
 
         req.session.userId = user.id;
         req.session.username = user.username;
+        req.session.isOwner = !!user.is_owner;
         res.json({ success: true, username: user.username });
     } catch (err) {
         console.error("Login error:", err);
@@ -58,6 +59,7 @@ exports.verifyMfaLogin = async (req, res) => {
         delete req.session.pendingMfaUserId;
         req.session.userId = user.id;
         req.session.username = user.username;
+        req.session.isOwner = !!user.is_owner;
         res.json({ success: true, username: user.username });
     } catch (err) {
         console.error("MFA login verify error:", err);
@@ -75,7 +77,12 @@ exports.logout = (req, res) => {
 exports.checkSession = (req, res) => {
     if (req.session && req.session.userId) {
         const user = db.prepare("SELECT totp_enabled FROM users WHERE id = ?").get(req.session.userId);
-        res.json({ authenticated: true, username: req.session.username, mfaEnabled: !!(user && user.totp_enabled) });
+        res.json({
+            authenticated: true,
+            username: req.session.username,
+            mfaEnabled: !!(user && user.totp_enabled),
+            isOwner: !!req.session.isOwner,
+        });
     } else {
         res.status(401).json({ authenticated: false });
     }
