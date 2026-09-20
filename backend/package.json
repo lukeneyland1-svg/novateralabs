@@ -4,7 +4,7 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-    "test": "find . ../public -name '*.js' -not -path '*/node_modules/*' -print0 | xargs -0 -n1 node --check",
+    "test": "find ../public -name '*.js' -print0 | xargs -0 -n1 node --check && node --test test/",
     "start": "node server.js"
   },
   "keywords": [],

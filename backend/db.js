@@ -2,7 +2,7 @@ const path = require("path");
 const Database = require("better-sqlite3");
 const bcrypt = require("bcryptjs");
 
-const DB_PATH = path.join(__dirname, "data", "novateralabs.db");
+const DB_PATH = process.env.NOVATERALABS_DB_PATH || path.join(__dirname, "data", "novateralabs.db");
 const db = new Database(DB_PATH);
 
 db.exec(`
