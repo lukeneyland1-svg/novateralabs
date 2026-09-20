@@ -427,3 +427,44 @@ document.getElementById('mfaDisableFormEl').addEventListener('submit', async (e)
     showMfaError(err.message);
   }
 });
+
+/* ---------------- Connect Your Server (agent ingestion) ---------------- */
+async function fetchApiKey(){
+  try{
+    const res = await fetch('/api/ingest/key');
+    const data = await res.json();
+    document.getElementById('ingestApiKey').textContent = data.apiKey;
+  } catch(err){
+    document.getElementById('ingestApiKey').textContent = 'Could not load API key.';
+  }
+}
+fetchApiKey();
+
+document.getElementById('ingestRegenerateBtn').addEventListener('click', async () => {
+  try{
+    const res = await fetch('/api/ingest/key/regenerate', { method: 'POST' });
+    const data = await res.json();
+    document.getElementById('ingestApiKey').textContent = data.apiKey;
+  } catch(err){
+    console.error(err);
+  }
+});
+
+async function fetchMyMetrics(){
+  try{
+    const res = await fetch('/api/ingest/metrics/mine');
+    const data = await res.json();
+    if(!data.received){
+      document.getElementById('ingestLastReported').textContent = 'No data received yet — run the agent to get started.';
+      return;
+    }
+    document.getElementById('ingestCpuVal').textContent = Math.round(data.cpuLoad) + '%';
+    document.getElementById('ingestRamVal').textContent = Math.round(data.ramUsage) + '%';
+    document.getElementById('ingestUptimeVal').textContent = Math.round(data.uptimeMinutes) + ' min';
+    document.getElementById('ingestLastReported').textContent = `Last reported ${relativeTime(data.reportedAt)}`;
+  } catch(err){
+    console.error('Metrics fetch failed:', err);
+  }
+}
+fetchMyMetrics();
+setInterval(fetchMyMetrics, 15000);

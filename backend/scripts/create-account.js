@@ -1,4 +1,5 @@
 const readline = require("readline");
+const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const db = require("../db");
 
@@ -42,7 +43,9 @@ function question(prompt, hide) {
   }
 
   const hash = bcrypt.hashSync(password, 10);
-  db.prepare("INSERT INTO users (username, password_hash, is_owner) VALUES (?, ?, 0)").run(username, hash);
+  const apiKey = crypto.randomBytes(24).toString("hex");
+  db.prepare("INSERT INTO users (username, password_hash, is_owner, api_key) VALUES (?, ?, 0, ?)").run(username, hash, apiKey);
   console.log(`Account "${username}" created.`);
+  console.log(`API key (for connecting a server via the agent script): ${apiKey}`);
   process.exit(0);
 })();

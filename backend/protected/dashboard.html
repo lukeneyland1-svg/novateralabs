@@ -191,6 +191,36 @@
 
       <div id="mfaError" style="display:none;color:var(--crit);font-size:12px;margin-top:10px;font-family:'IBM Plex Mono',monospace;"></div>
     </section>
+
+    <!-- Connect Your Server -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Connect Your Server</h2>
+      </div>
+      <p class="prose" style="margin-bottom:16px;">Run the metrics agent on your own server to report its CPU, RAM, and uptime here. No dependencies — just Node.js and your API key below.</p>
+
+      <p style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);margin-bottom:6px;">Your API key</p>
+      <p style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--text);word-break:break-all;margin:0 0 12px;" id="ingestApiKey">Loading…</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;">
+        <button class="btn" id="ingestRegenerateBtn">Regenerate key</button>
+        <a class="btn" href="/novateralabs-agent.js" download>Download agent script</a>
+      </div>
+      <p style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--text-dim);margin:0 0 20px;">Run every minute via cron: <code>* * * * * NOVATERALABS_API_KEY=your-key node /path/to/novateralabs-agent.js</code></p>
+
+      <div class="metric-row">
+        <span class="metric-label">CPU LOAD</span>
+        <span class="metric-value" id="ingestCpuVal">—</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">RAM USAGE</span>
+        <span class="metric-value" id="ingestRamVal">—</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">UPTIME</span>
+        <span class="metric-value" id="ingestUptimeVal">—</span>
+      </div>
+      <p style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--text-dim);margin:10px 0 0;" id="ingestLastReported">No data received yet — run the agent to get started.</p>
+    </section>
   </main>
 
   <footer class="footer">© 2026 NovaTeraLabs</footer>

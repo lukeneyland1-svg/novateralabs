@@ -1,4 +1,5 @@
 const path = require("path");
+const crypto = require("crypto");
 const Database = require("better-sqlite3");
 const bcrypt = require("bcryptjs");
 
@@ -48,6 +49,7 @@ try { db.exec("ALTER TABLE users ADD COLUMN totp_secret TEXT"); } catch (e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0"); } catch (e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN backup_codes TEXT"); } catch (e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN is_owner INTEGER NOT NULL DEFAULT 0"); } catch (e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN api_key TEXT"); } catch (e) {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS password_resets (
@@ -57,6 +59,22 @@ db.exec(`
     used INTEGER NOT NULL DEFAULT 0
   )
 `);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS metrics_snapshots (
+    user_id INTEGER PRIMARY KEY,
+    cpu_load REAL,
+    ram_usage REAL,
+    uptime_minutes REAL,
+    reported_at TEXT NOT NULL
+  )
+`);
+
+// Every account needs its own API key for the agent/data-ingestion pipeline.
+// Each row needs a distinct random value, so this can't be a single UPDATE.
+for (const user of db.prepare("SELECT id FROM users WHERE api_key IS NULL").all()) {
+  db.prepare("UPDATE users SET api_key = ? WHERE id = ?").run(crypto.randomBytes(24).toString("hex"), user.id);
+}
 
 // The very first account ever created becomes the owner (idempotent — a
 // no-op once an owner is already set). Then attribute any ownerless

@@ -1,9 +1,9 @@
 // Minimal fake Express req/res for unit-testing controllers without a real server.
-function mockReq({ body = {}, query = {}, session = null } = {}) {
+function mockReq({ body = {}, query = {}, session = null, headers = {} } = {}) {
     if (session && typeof session.destroy !== "function") {
         session.destroy = (cb) => cb && cb();
     }
-    return { body, query, session };
+    return { body, query, session, headers };
 }
 
 function mockRes() {
