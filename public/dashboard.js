@@ -346,12 +346,36 @@ function applyOwnerVisibility(isOwner){
   document.querySelectorAll('.owner-only').forEach(el => { el.style.display = 'none'; });
 }
 
+function renderBillingStatus(isOwner, status){
+  const panel = document.getElementById('billingPanel');
+  if(isOwner){
+    // The owner runs the service, not a customer of it.
+    panel.style.display = 'none';
+    return;
+  }
+  const tag = document.getElementById('billingStatusTag');
+  const btn = document.getElementById('billingSubscribeBtn');
+  const desc = document.getElementById('billingDescription');
+  if(status === 'active'){
+    tag.textContent = 'Active';
+    tag.className = 'tag';
+    btn.style.display = 'none';
+    desc.textContent = 'Your subscription is active.';
+  } else {
+    tag.textContent = 'Not subscribed';
+    tag.className = 'tag warn';
+    btn.style.display = 'inline-flex';
+    desc.textContent = 'Subscribe to unlock automation tasks and the server-connection panel below.';
+  }
+}
+
 async function initSession(){
   try{
     const res = await fetch('/api/auth/session');
     const data = await res.json();
     renderMfaStatus(!!data.mfaEnabled);
     applyOwnerVisibility(!!data.isOwner);
+    renderBillingStatus(!!data.isOwner, data.subscriptionStatus);
     if(data.isOwner){
       fetchDashboard();
       setInterval(fetchDashboard, 4000);
@@ -362,6 +386,26 @@ async function initSession(){
   }
 }
 initSession();
+
+if(new URLSearchParams(window.location.search).get('billing') === 'success'){
+  document.getElementById('billingProcessingNote').style.display = 'block';
+}
+
+document.getElementById('billingSubscribeBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('billingSubscribeBtn');
+  btn.disabled = true;
+  btn.textContent = 'Redirecting...';
+  try{
+    const res = await fetch('/api/billing/checkout', { method: 'POST' });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Could not start checkout.');
+    window.location.href = data.url;
+  } catch(err){
+    console.error(err);
+    btn.disabled = false;
+    btn.textContent = 'Subscribe';
+  }
+});
 
 mfaEnableBtn.addEventListener('click', async () => {
   mfaError.style.display = 'none';

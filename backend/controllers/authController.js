@@ -76,12 +76,13 @@ exports.logout = (req, res) => {
 
 exports.checkSession = (req, res) => {
     if (req.session && req.session.userId) {
-        const user = db.prepare("SELECT totp_enabled FROM users WHERE id = ?").get(req.session.userId);
+        const user = db.prepare("SELECT totp_enabled, subscription_status FROM users WHERE id = ?").get(req.session.userId);
         res.json({
             authenticated: true,
             username: req.session.username,
             mfaEnabled: !!(user && user.totp_enabled),
             isOwner: !!req.session.isOwner,
+            subscriptionStatus: user ? user.subscription_status : "none",
         });
     } else {
         res.status(401).json({ authenticated: false });

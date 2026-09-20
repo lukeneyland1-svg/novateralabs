@@ -137,7 +137,7 @@ test("checkSession reports authenticated when a session has a userId", () => {
 
     authController.checkSession(req, res);
 
-    assert.deepEqual(res.body, { authenticated: true, username: "admin", mfaEnabled: false, isOwner: true });
+    assert.deepEqual(res.body, { authenticated: true, username: "admin", mfaEnabled: false, isOwner: true, subscriptionStatus: "none" });
 });
 
 test("checkSession reports unauthenticated with no session", () => {

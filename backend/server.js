@@ -15,15 +15,16 @@ const contactRoutes = require('./server/routes/contact');
 const breachRoutes = require('./server/routes/breach');
 const simulationRoutes = require('./server/routes/simulation');
 const ingestRoutes = require('./server/routes/ingest');
+const billingRoutes = require('./server/routes/billing');
 
 const requireAuth = require('./middleware/requireAuth');
 const requireAuthPage = require('./middleware/requireAuthPage');
 const requireOwner = require('./middleware/requireOwner');
+const requireSubscription = require('./middleware/requireSubscription');
 const scheduler = require('./scheduler');
 
 const app = express();
 app.use(cors({ origin: true, credentials: true }));
-app.use(express.json());
 
 app.use(session({
   secret: SESSION_SECRET,
@@ -36,6 +37,17 @@ app.use(session({
   }
 }));
 
+// Mounted before the global express.json() below: the webhook route inside
+// needs Stripe's raw, unparsed request body to verify its signature. Once
+// express.json() has consumed a request body into a parsed object, the
+// original bytes Stripe signed are gone — so this router (and its own
+// express.raw(), scoped to just the webhook path) must see the request first.
+// It still needs to come after the session middleware above, since its
+// /checkout route reads req.session.
+app.use('/api/billing', billingRoutes);
+
+app.use(express.json());
+
 app.get('/dashboard.html', requireAuthPage, (req, res) => {
   res.sendFile(path.join(__dirname, 'protected', 'dashboard.html'));
 });
@@ -47,7 +59,7 @@ app.use('/api/contact', contactRoutes);
 app.use('/api/breach-check', breachRoutes);
 app.use('/api/dashboard', requireAuth, requireOwner, dashboardRoutes);
 app.use('/api/security', requireAuth, requireOwner, securityRoutes);
-app.use('/api/automation', requireAuth, automationRoutes);
+app.use('/api/automation', requireAuth, requireSubscription, automationRoutes);
 app.use('/api/simulation', requireAuth, requireOwner, simulationRoutes);
 app.use('/api/ingest', ingestRoutes);
 
