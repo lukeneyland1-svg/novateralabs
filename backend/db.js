@@ -38,9 +38,12 @@ db.exec(`
   )
 `);
 
-// Adds the column needed for password reset. Safe no-op if it already
-// exists (same pattern as the automation_tasks migration above).
+// Adds columns needed for password reset and MFA. Safe no-ops if they
+// already exist (same pattern as the automation_tasks migration above).
 try { db.exec("ALTER TABLE users ADD COLUMN email TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN totp_secret TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0"); } catch (e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN backup_codes TEXT"); } catch (e) {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS password_resets (

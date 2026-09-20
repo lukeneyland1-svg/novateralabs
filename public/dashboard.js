@@ -319,3 +319,100 @@ automationForm.addEventListener('submit', async (e) => {
     autoFormError.classList.add('show');
   }
 });
+
+/* ---------------- Account Security (MFA) ---------------- */
+const mfaStatusTag = document.getElementById('mfaStatusTag');
+const mfaEnableBtn = document.getElementById('mfaEnableBtn');
+const mfaDisableBtn = document.getElementById('mfaDisableBtn');
+const mfaSetupPanel = document.getElementById('mfaSetupPanel');
+const mfaBackupCodes = document.getElementById('mfaBackupCodes');
+const mfaDisableForm = document.getElementById('mfaDisableForm');
+const mfaError = document.getElementById('mfaError');
+
+function showMfaError(message){
+  mfaError.textContent = message;
+  mfaError.style.display = 'block';
+}
+
+function renderMfaStatus(enabled){
+  mfaStatusTag.textContent = enabled ? 'Enabled' : 'Disabled';
+  mfaStatusTag.className = enabled ? 'tag' : 'tag warn';
+  mfaEnableBtn.style.display = enabled ? 'none' : 'inline-flex';
+  mfaDisableBtn.style.display = enabled ? 'inline-flex' : 'none';
+}
+
+async function fetchMfaStatus(){
+  try{
+    const res = await fetch('/api/auth/session');
+    const data = await res.json();
+    renderMfaStatus(!!data.mfaEnabled);
+  } catch(err){
+    mfaStatusTag.textContent = 'Unknown';
+  }
+}
+fetchMfaStatus();
+
+mfaEnableBtn.addEventListener('click', async () => {
+  mfaError.style.display = 'none';
+  try{
+    const res = await fetch('/api/auth/mfa/setup', { method: 'POST' });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Could not start MFA setup.');
+
+    document.getElementById('mfaQrCode').src = data.qrCode;
+    document.getElementById('mfaSecretText').textContent = data.secret;
+    mfaSetupPanel.style.display = 'block';
+  } catch(err){
+    showMfaError(err.message);
+  }
+});
+
+document.getElementById('mfaConfirmForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  mfaError.style.display = 'none';
+  const code = document.getElementById('mfaConfirmCode').value;
+
+  try{
+    const res = await fetch('/api/auth/mfa/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Invalid code.');
+
+    mfaSetupPanel.style.display = 'none';
+    document.getElementById('mfaBackupCodesList').innerHTML = data.backupCodes.map(c => `<li>${c}</li>`).join('');
+    mfaBackupCodes.style.display = 'block';
+    renderMfaStatus(true);
+  } catch(err){
+    showMfaError(err.message);
+  }
+});
+
+mfaDisableBtn.addEventListener('click', () => {
+  mfaError.style.display = 'none';
+  mfaDisableForm.style.display = 'block';
+});
+
+document.getElementById('mfaDisableFormEl').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  mfaError.style.display = 'none';
+  const password = document.getElementById('mfaDisablePassword').value;
+
+  try{
+    const res = await fetch('/api/auth/mfa/disable', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Could not disable MFA.');
+
+    mfaDisableForm.style.display = 'none';
+    document.getElementById('mfaDisablePassword').value = '';
+    renderMfaStatus(false);
+  } catch(err){
+    showMfaError(err.message);
+  }
+});

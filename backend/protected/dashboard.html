@@ -148,6 +148,49 @@
         </table>
       </div>
     </section>
+
+    <!-- Account Security -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Account Security</h2>
+        <span class="tag" id="mfaStatusTag">Loading…</span>
+      </div>
+      <p class="prose" style="margin-bottom:16px;">Two-factor authentication requires a code from an authenticator app (like Google Authenticator or Authy) in addition to your password when signing in.</p>
+      <div id="mfaControls" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+        <button class="btn primary" id="mfaEnableBtn" style="display:none;">Enable two-factor authentication</button>
+        <button class="btn" id="mfaDisableBtn" style="display:none;">Disable two-factor authentication</button>
+      </div>
+
+      <div id="mfaSetupPanel" style="display:none;">
+        <p class="prose" style="margin-bottom:12px;">Scan this QR code with your authenticator app, or enter the key manually, then confirm with a generated code.</p>
+        <img id="mfaQrCode" alt="MFA QR code" style="background:#fff;padding:8px;border-radius:8px;display:block;margin-bottom:10px;">
+        <p style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text-dim);margin:0 0 16px;word-break:break-all;">Manual entry key: <span id="mfaSecretText"></span></p>
+        <form id="mfaConfirmForm" style="max-width:280px;">
+          <label style="display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);margin-bottom:14px;">
+            Enter the 6-digit code
+            <input type="text" id="mfaConfirmCode" required style="display:block;width:100%;margin-top:7px;background:var(--panel-alt);border:1px solid var(--line);border-radius:8px;padding:10px 11px;color:var(--text);font-family:'Inter',sans-serif;font-size:13.5px;">
+          </label>
+          <button type="submit" class="btn primary">Confirm and enable</button>
+        </form>
+      </div>
+
+      <div id="mfaBackupCodes" style="display:none;">
+        <p style="color:var(--crit);font-size:13.5px;margin:0 0 10px;"><b>Save these backup codes now — they won't be shown again.</b> Each one can be used once if you lose access to your authenticator app.</p>
+        <ul id="mfaBackupCodesList" style="margin:0;padding-left:18px;font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:1.9;color:var(--text);"></ul>
+      </div>
+
+      <div id="mfaDisableForm" style="display:none;max-width:280px;">
+        <form id="mfaDisableFormEl">
+          <label style="display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);margin-bottom:14px;">
+            Confirm your password to disable
+            <input type="password" id="mfaDisablePassword" required style="display:block;width:100%;margin-top:7px;background:var(--panel-alt);border:1px solid var(--line);border-radius:8px;padding:10px 11px;color:var(--text);font-family:'Inter',sans-serif;font-size:13.5px;">
+          </label>
+          <button type="submit" class="btn">Disable</button>
+        </form>
+      </div>
+
+      <div id="mfaError" style="display:none;color:var(--crit);font-size:12px;margin-top:10px;font-family:'IBM Plex Mono',monospace;"></div>
+    </section>
   </main>
 
   <footer class="footer">© 2026 NovaTeraLabs</footer>

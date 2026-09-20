@@ -2,6 +2,7 @@ const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const db = require("../db");
 const { transporter, EMAIL_USER } = require("../services/mailer");
+const { verifyAndConsumeBackupCode, safeVerifyTotp } = require("./mfaController");
 
 const RESET_TOKEN_TTL_MS = 30 * 60 * 1000;
 
@@ -22,11 +23,44 @@ exports.login = (req, res) => {
             return res.status(401).json({ error: "Invalid username or password" });
         }
 
+        if (user.totp_enabled) {
+            req.session.pendingMfaUserId = user.id;
+            return res.json({ mfaRequired: true });
+        }
+
         req.session.userId = user.id;
         req.session.username = user.username;
         res.json({ success: true, username: user.username });
     } catch (err) {
         console.error("Login error:", err);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+
+exports.verifyMfaLogin = async (req, res) => {
+    try {
+        const { code } = req.body;
+        if (!req.session.pendingMfaUserId || !code) {
+            return res.status(400).json({ error: "No pending login to verify." });
+        }
+
+        const user = db.prepare("SELECT * FROM users WHERE id = ?").get(req.session.pendingMfaUserId);
+        if (!user || !user.totp_enabled) {
+            return res.status(400).json({ error: "No pending login to verify." });
+        }
+
+        const result = await safeVerifyTotp(user.totp_secret, code);
+        const validCode = result.valid || verifyAndConsumeBackupCode(user, code);
+        if (!validCode) {
+            return res.status(401).json({ error: "Invalid code." });
+        }
+
+        delete req.session.pendingMfaUserId;
+        req.session.userId = user.id;
+        req.session.username = user.username;
+        res.json({ success: true, username: user.username });
+    } catch (err) {
+        console.error("MFA login verify error:", err);
         res.status(500).json({ error: "Internal Server Error" });
     }
 };
@@ -40,7 +74,8 @@ exports.logout = (req, res) => {
 
 exports.checkSession = (req, res) => {
     if (req.session && req.session.userId) {
-        res.json({ authenticated: true, username: req.session.username });
+        const user = db.prepare("SELECT totp_enabled FROM users WHERE id = ?").get(req.session.userId);
+        res.json({ authenticated: true, username: req.session.username, mfaEnabled: !!(user && user.totp_enabled) });
     } else {
         res.status(401).json({ authenticated: false });
     }
