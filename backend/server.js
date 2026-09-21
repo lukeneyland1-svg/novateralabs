@@ -20,6 +20,7 @@ const scanRoutes = require('./server/routes/scan');
 const statusRoutes = require('./server/routes/status');
 const statusChecker = require('./services/statusChecker');
 const complianceRoutes = require('./server/routes/compliance');
+const apiV1Routes = require('./server/routes/apiV1');
 
 const requireAuth = require('./middleware/requireAuth');
 const requireAuthPage = require('./middleware/requireAuthPage');
@@ -69,6 +70,7 @@ app.use('/api/ingest', ingestRoutes);
 app.use('/api/scan', scanRoutes);
 app.use('/api/status', statusRoutes);
 app.use('/api/compliance', complianceRoutes);
+app.use('/api/v1', apiV1Routes);
 
 scheduler.loadAndScheduleAll();
 statusChecker.start();

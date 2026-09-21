@@ -10,6 +10,8 @@ const { mockReq, mockRes } = require("../test-helpers/mockExpress");
 
 const userId = db.prepare("INSERT INTO users (username, password_hash, api_key) VALUES (?, ?, ?)")
     .run("agent-owner", bcrypt.hashSync("password123", 10), "real-api-key").lastInsertRowid;
+const ownerId = db.prepare("INSERT INTO users (username, password_hash, api_key, is_owner) VALUES (?, ?, ?, 1)")
+    .run("owner-account", bcrypt.hashSync("password123", 10), "owner-api-key").lastInsertRowid;
 
 test("requireApiKey attaches req.apiUserId and calls next() for a valid key", () => {
     const req = mockReq({ headers: { "x-api-key": "real-api-key" } });
@@ -20,6 +22,16 @@ test("requireApiKey attaches req.apiUserId and calls next() for a valid key", ()
 
     assert.equal(nextCalled, true);
     assert.equal(req.apiUserId, userId);
+});
+
+test("requireApiKey sets req.apiIsOwner correctly for an owner's key vs a regular account's key", () => {
+    const ownerReq = mockReq({ headers: { "x-api-key": "owner-api-key" } });
+    requireApiKey(ownerReq, mockRes(), () => {});
+    assert.equal(ownerReq.apiIsOwner, true);
+
+    const regularReq = mockReq({ headers: { "x-api-key": "real-api-key" } });
+    requireApiKey(regularReq, mockRes(), () => {});
+    assert.equal(regularReq.apiIsOwner, false);
 });
 
 test("requireApiKey returns 401 when the key is missing", () => {

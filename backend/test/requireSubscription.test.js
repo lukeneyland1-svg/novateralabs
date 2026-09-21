@@ -45,3 +45,43 @@ test("requireSubscription returns 402 for a non-owner account with no active sub
     assert.equal(nextCalled, false);
     assert.equal(res.statusCode, 402);
 });
+
+// ---- Same middleware, now via API-key auth (req.apiUserId/req.apiIsOwner)
+// instead of a browser session — this is what the new public API routes use.
+
+test("requireSubscription passes for an owner authenticated via API key", () => {
+    const req = mockReq({ session: null });
+    req.apiUserId = ownerId;
+    req.apiIsOwner = true;
+    const res = mockRes();
+    let nextCalled = false;
+
+    requireSubscription(req, res, () => { nextCalled = true; });
+
+    assert.equal(nextCalled, true);
+});
+
+test("requireSubscription passes for a subscribed account authenticated via API key", () => {
+    const req = mockReq({ session: null });
+    req.apiUserId = activeId;
+    req.apiIsOwner = false;
+    const res = mockRes();
+    let nextCalled = false;
+
+    requireSubscription(req, res, () => { nextCalled = true; });
+
+    assert.equal(nextCalled, true);
+});
+
+test("requireSubscription returns 402 for an unsubscribed account authenticated via API key", () => {
+    const req = mockReq({ session: null });
+    req.apiUserId = unpaidId;
+    req.apiIsOwner = false;
+    const res = mockRes();
+    let nextCalled = false;
+
+    requireSubscription(req, res, () => { nextCalled = true; });
+
+    assert.equal(nextCalled, false);
+    assert.equal(res.statusCode, 402);
+});

@@ -9,11 +9,12 @@ module.exports = function requireApiKey(req, res, next) {
         return res.status(401).json({ error: "Missing API key" });
     }
 
-    const user = db.prepare("SELECT id FROM users WHERE api_key = ?").get(apiKey);
+    const user = db.prepare("SELECT id, is_owner FROM users WHERE api_key = ?").get(apiKey);
     if (!user) {
         return res.status(401).json({ error: "Invalid API key" });
     }
 
     req.apiUserId = user.id;
+    req.apiIsOwner = !!user.is_owner;
     next();
 };

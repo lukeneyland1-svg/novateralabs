@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>API Docs – NovaTeraLabs</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+  <header class="topbar">
+    <a class="brand" href="index.html">NovaTera<span>Labs</span></a>
+    <nav class="nav">
+      <a href="index.html">Home</a>
+      <a href="about.html">About</a>
+      <a href="projects.html">Projects</a>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="breach-check.html">Breach Check</a>
+      <a href="status.html">Status</a>
+      <a href="contact.html">Contact</a>
+    </nav>
+    <div class="status">
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">☾</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="page-head">
+      <p class="eyebrow">DEVELOPER REFERENCE</p>
+      <h1>NovaTeraLabs API</h1>
+      <p class="sub">A read-only API for pulling your own account's data into your own tools — scripts, SIEMs, alerting systems, whatever you already use.</p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Authentication</h2></div>
+      <p class="prose">Every request needs your account's API key in an <code>X-API-Key</code> header. Find (or regenerate) your key on your <a href="dashboard.html">dashboard</a>, in the "Connect Your Server" panel.</p>
+      <pre class="log-output">curl https://novateralabs.com/api/v1/metrics \
+  -H "X-API-Key: your-api-key-here"</pre>
+      <p class="prose" style="margin-top:12px;">A missing or invalid key returns <code>401</code>. An account without an active subscription returns <code>402</code> (the owner's own key is always exempt).</p>
+    </div>
+
+    <section class="panel">
+      <div class="panel-head"><h2>GET /api/v1/metrics</h2></div>
+      <p class="prose">Your account's latest reported CPU/RAM/uptime snapshot.</p>
+      <pre class="log-output">{
+  "received": true,
+  "cpuLoad": 12.5,
+  "ramUsage": 40.2,
+  "uptimeMinutes": 1000,
+  "reportedAt": "2026-09-21T00:00:00.000Z"
+}</pre>
+      <p class="prose">If your agent hasn't reported anything yet, this returns <code>{ "received": false }</code>.</p>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h2>GET /api/v1/security-events</h2></div>
+      <p class="prose">Your account's currently-reported security events (the same data shown on your dashboard's "Recent security events" list).</p>
+      <pre class="log-output">{
+  "events": [
+    {
+      "source": "linux",
+      "severity": "critical",
+      "type": "Auth Log",
+      "message": "Failed password for root",
+      "ip": "203.0.113.5",
+      "timestamp": "2026-09-21T00:00:00.000Z",
+      "abuseScore": 87,
+      "countryCode": "RU",
+      "isMalicious": true
+    }
+  ]
+}</pre>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h2>GET /api/v1/compliance-log</h2></div>
+      <p class="prose">Your account's full retained security-event history (up to a year), as JSON. Optional <code>from</code>/<code>to</code> query params (ISO 8601 timestamps) filter by date range. For a downloadable file instead, use the "Download CSV" button on your dashboard.</p>
+      <pre class="log-output">GET /api/v1/compliance-log?from=2026-01-01T00:00:00.000Z
+
+{
+  "events": [
+    { "source": "linux", "severity": "critical", "type": "Auth Log",
+      "message": "Failed password for root", "ip": "203.0.113.5",
+      "isMalicious": true, "timestamp": "2026-09-21T00:00:00.000Z" }
+  ]
+}</pre>
+    </section>
+  </main>
+
+  <footer class="footer">© 2026 NovaTeraLabs</footer>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
