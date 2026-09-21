@@ -57,6 +57,16 @@ app.get('/dashboard.html', requireAuthPage, (req, res) => {
   res.sendFile(path.join(__dirname, 'protected', 'dashboard.html'));
 });
 
+// Explicit routes, not just a dropped-in file: express.static ignores
+// dotfiles/dot-directories by default (confirmed by testing), so a file at
+// public/.well-known/security.txt would silently 404. Serving it explicitly
+// here — rather than turning on `dotfiles: 'allow'` for the static
+// middleware below — means only this one intentional path is exposed,
+// not every dotfile that might ever end up in public/.
+app.get(['/.well-known/security.txt', '/security.txt'], (req, res) => {
+  res.type('text/plain').sendFile(path.join(__dirname, '..', 'public', 'security.txt'));
+});
+
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 app.use('/api/auth', authRoutes);
