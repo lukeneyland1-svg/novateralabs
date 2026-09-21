@@ -62,6 +62,7 @@ try { db.exec("ALTER TABLE users ADD COLUMN api_key TEXT"); } catch (e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN subscription_status TEXT NOT NULL DEFAULT 'none'"); } catch (e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN stripe_customer_id TEXT"); } catch (e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN stripe_subscription_id TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN scan_target TEXT"); } catch (e) {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS password_resets (

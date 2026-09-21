@@ -547,3 +547,71 @@ function pollIngestData(){
 }
 pollIngestData();
 setInterval(pollIngestData, 15000);
+
+/* ---------------- Attack Surface Scan ---------------- */
+function renderScanResult(data){
+  const box = document.getElementById('scanResult');
+
+  const sslLine = data.ssl.available
+    ? (data.ssl.valid
+        ? `<div class="alert"><span class="sev-dot low"></span><span class="alert-msg">SSL certificate valid — expires in ${data.ssl.daysUntilExpiry} days (issuer: ${escapeHtml(data.ssl.issuer || 'unknown')})</span></div>`
+        : `<div class="alert"><span class="sev-dot crit"></span><span class="alert-msg">SSL certificate invalid — ${escapeHtml(data.ssl.invalidReason || 'unknown reason')}</span></div>`)
+    : `<div class="alert"><span class="sev-dot crit"></span><span class="alert-msg">No HTTPS available on this domain</span></div>`;
+
+  const headersLine = data.headers
+    ? (data.headers.missing.length
+        ? `<div class="alert"><span class="sev-dot warn"></span><span class="alert-msg">Missing security headers: ${data.headers.missing.map(escapeHtml).join(', ')}</span></div>`
+        : `<div class="alert"><span class="sev-dot low"></span><span class="alert-msg">All checked security headers present</span></div>`)
+    : `<div class="alert"><span class="sev-dot low"></span><span class="alert-msg">Could not check security headers</span></div>`;
+
+  const pathsLine = !data.paths
+    ? `<div class="alert"><span class="sev-dot low"></span><span class="alert-msg">Could not check exposed paths</span></div>`
+    : data.paths.inconclusive
+      ? `<div class="alert"><span class="sev-dot low"></span><span class="alert-msg">Exposed-path check inconclusive (site returns 200 for unknown paths)</span></div>`
+      : data.paths.exposed.length
+        ? `<div class="alert"><span class="sev-dot crit"></span><span class="alert-msg">Exposed paths found: ${data.paths.exposed.map(escapeHtml).join(', ')}</span></div>`
+        : `<div class="alert"><span class="sev-dot low"></span><span class="alert-msg">No commonly-exposed paths found</span></div>`;
+
+  box.innerHTML = sslLine + headersLine + pathsLine;
+  box.style.display = 'block';
+}
+
+document.getElementById('scanForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const target = document.getElementById('scanTarget').value.trim();
+  const btn = document.getElementById('scanBtn');
+  const box = document.getElementById('scanResult');
+
+  btn.disabled = true;
+  btn.textContent = 'Scanning...';
+  box.style.display = 'none';
+
+  try{
+    const res = await fetch('/api/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target }),
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Scan failed.');
+
+    renderScanResult(data);
+  } catch(err){
+    box.innerHTML = `<p style="color:var(--crit);font-size:13.5px;">${escapeHtml(err.message)}</p>`;
+    box.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Scan now';
+  }
+});
+
+async function fetchScanTarget(){
+  try{
+    const res = await fetch('/api/scan/target');
+    const data = await res.json();
+    if(data.target) document.getElementById('scanTarget').value = data.target;
+  } catch(err){
+    // Non-critical — just skip pre-filling if this fails (e.g. not subscribed yet).
+  }
+}
+fetchScanTarget();

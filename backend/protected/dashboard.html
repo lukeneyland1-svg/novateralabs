@@ -235,6 +235,19 @@
       <p style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);margin-bottom:10px;">Recent security events</p>
       <div class="alert-feed" id="ingestEventsFeed"></div>
     </section>
+
+    <!-- Attack Surface Scan -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Attack Surface Scan</h2>
+      </div>
+      <p class="prose" style="margin-bottom:16px;">Check a domain from the outside the way an attacker's first look would: security headers, SSL certificate health, and commonly-exposed paths.</p>
+      <form id="scanForm" style="display:flex;gap:10px;flex-wrap:wrap;max-width:480px;margin-bottom:16px;">
+        <input type="text" id="scanTarget" required placeholder="example.com" style="flex:1;min-width:200px;background:var(--panel-alt);border:1px solid var(--line);border-radius:8px;padding:10px 11px;color:var(--text);font-family:'Inter',sans-serif;font-size:13.5px;">
+        <button type="submit" class="btn primary" id="scanBtn">Scan now</button>
+      </form>
+      <div id="scanResult" style="display:none;"></div>
+    </section>
   </main>
 
   <footer class="footer">© 2026 NovaTeraLabs</footer>
