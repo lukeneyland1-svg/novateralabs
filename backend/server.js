@@ -19,6 +19,7 @@ const billingRoutes = require('./server/routes/billing');
 const scanRoutes = require('./server/routes/scan');
 const statusRoutes = require('./server/routes/status');
 const statusChecker = require('./services/statusChecker');
+const complianceRoutes = require('./server/routes/compliance');
 
 const requireAuth = require('./middleware/requireAuth');
 const requireAuthPage = require('./middleware/requireAuthPage');
@@ -67,6 +68,7 @@ app.use('/api/simulation', requireAuth, requireOwner, simulationRoutes);
 app.use('/api/ingest', ingestRoutes);
 app.use('/api/scan', scanRoutes);
 app.use('/api/status', statusRoutes);
+app.use('/api/compliance', complianceRoutes);
 
 scheduler.loadAndScheduleAll();
 statusChecker.start();

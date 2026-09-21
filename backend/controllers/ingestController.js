@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const db = require("../db");
 const alertNotifier = require("../services/alertNotifier");
 const threatIntel = require("../services/threatIntel");
+const complianceLog = require("../services/complianceLog");
 
 exports.reportMetrics = (req, res) => {
     try {
@@ -82,6 +83,7 @@ exports.reportSecurityEvents = async (req, res) => {
 
         const enriched = await threatIntel.enrichAlerts(events);
         replaceSecurityEvents(req.apiUserId, enriched);
+        complianceLog.recordEvents(req.apiUserId, enriched);
         alertNotifier.checkAndNotifyAccount(req.apiUserId, enriched);
 
         res.json({ success: true, count: events.length });

@@ -40,6 +40,14 @@ function mockRes() {
         res.clearedCookie = name;
         return res;
     };
+    res.setHeader = (name, value) => {
+        res.headers[name] = value;
+        return res;
+    };
+    res.send = (body) => {
+        res.body = body;
+        return res;
+    };
     return res;
 }
 

@@ -123,6 +123,24 @@ db.exec(`
 `);
 db.exec("CREATE INDEX IF NOT EXISTS idx_status_checks_component_time ON status_checks(component, checked_at)");
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS compliance_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    fingerprint TEXT NOT NULL,
+    source TEXT NOT NULL,
+    severity TEXT NOT NULL,
+    type TEXT NOT NULL,
+    message TEXT NOT NULL,
+    ip TEXT,
+    is_malicious INTEGER,
+    timestamp TEXT NOT NULL,
+    recorded_at TEXT NOT NULL,
+    UNIQUE(user_id, fingerprint)
+  )
+`);
+db.exec("CREATE INDEX IF NOT EXISTS idx_compliance_log_user_time ON compliance_log(user_id, timestamp)");
+
 // Every account needs its own API key for the agent/data-ingestion pipeline.
 // Each row needs a distinct random value, so this can't be a single UPDATE.
 for (const user of db.prepare("SELECT id FROM users WHERE api_key IS NULL").all()) {

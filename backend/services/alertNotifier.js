@@ -13,6 +13,7 @@ function fingerprint(alert) {
         .update(`${alert.source}|${alert.type}|${alert.message}|${alert.timestamp}`)
         .digest("hex");
 }
+exports.fingerprint = fingerprint;
 
 function pruneOldFingerprints() {
     const cutoff = new Date(Date.now() - PRUNE_AFTER_MS).toISOString();

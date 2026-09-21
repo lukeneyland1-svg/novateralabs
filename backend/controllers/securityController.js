@@ -4,6 +4,8 @@ const path = require("path");
 const { EventEmitter } = require("events");
 const alertNotifier = require("../services/alertNotifier");
 const threatIntel = require("../services/threatIntel");
+const complianceLog = require("../services/complianceLog");
+const db = require("../db");
 
 const WINDOWS_ALERTS_PATH = path.join(__dirname, "../data/windows-alerts.json");
 const LINUX_LOG_PATHS     = ["/var/log/auth.log", "/var/log/secure"];
@@ -153,6 +155,9 @@ async function refreshCache() {
 
     alertEmitter.emit("alerts", cachedAlerts);
     alertNotifier.checkAndNotify(cachedAlerts);
+
+    const owner = db.prepare("SELECT id FROM users WHERE is_owner = 1").get();
+    if (owner) complianceLog.recordEvents(owner.id, cachedAlerts);
 }
 
 // Proactively refresh so alerts are picked up and pushed even with no active pollers/streams.
