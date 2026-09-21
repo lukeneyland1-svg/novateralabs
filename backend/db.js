@@ -112,6 +112,17 @@ db.exec(`
   )
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS status_checks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    component TEXT NOT NULL,
+    is_up INTEGER NOT NULL,
+    response_time_ms INTEGER,
+    checked_at TEXT NOT NULL
+  )
+`);
+db.exec("CREATE INDEX IF NOT EXISTS idx_status_checks_component_time ON status_checks(component, checked_at)");
+
 // Every account needs its own API key for the agent/data-ingestion pipeline.
 // Each row needs a distinct random value, so this can't be a single UPDATE.
 for (const user of db.prepare("SELECT id FROM users WHERE api_key IS NULL").all()) {

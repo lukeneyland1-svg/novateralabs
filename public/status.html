@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Status – NovaTeraLabs</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+  <header class="topbar">
+    <a class="brand" href="index.html">NovaTera<span>Labs</span></a>
+    <nav class="nav">
+      <a href="index.html">Home</a>
+      <a href="about.html">About</a>
+      <a href="projects.html">Projects</a>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="breach-check.html">Breach Check</a>
+      <a href="status.html" class="active">Status</a>
+      <a href="contact.html">Contact</a>
+    </nav>
+    <div class="status">
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">☾</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="page-head">
+      <p class="eyebrow">SYSTEM STATUS</p>
+      <h1>NovaTeraLabs service status</h1>
+      <p class="sub">Live status and 30-day uptime history for the core systems behind NovaTeraLabs.</p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2 id="overallStatusText">Loading…</h2>
+        <span class="tag" id="overallStatusTag">—</span>
+      </div>
+      <div id="componentsList"></div>
+    </div>
+  </main>
+
+  <footer class="footer">© 2026 NovaTeraLabs</footer>
+</div>
+
+<script src="script.js"></script>
+<script>
+async function fetchStatus(){
+  try{
+    const res = await fetch('/api/status');
+    const data = await res.json();
+    renderStatus(data);
+  } catch(err){
+    document.getElementById('overallStatusText').textContent = 'Could not load status';
+    document.getElementById('overallStatusTag').textContent = 'Unknown';
+  }
+}
+
+function renderStatus(data){
+  const textEl = document.getElementById('overallStatusText');
+  const tagEl = document.getElementById('overallStatusTag');
+  const operational = data.overall === 'operational';
+
+  textEl.textContent = operational ? 'All Systems Operational' : 'Degraded Performance';
+  tagEl.textContent = operational ? 'Operational' : 'Degraded';
+  tagEl.className = operational ? 'tag' : 'tag warn';
+
+  document.getElementById('componentsList').innerHTML = data.components.map(c => {
+    const dotClass = c.isUp === null ? 'low' : (c.isUp ? 'low' : 'crit');
+    const stateText = c.isUp === null ? 'No data yet' : (c.isUp ? 'Operational' : 'Down');
+    const uptimeText = c.uptimePercent === null ? '' : ` <span style="color:var(--text-dim);">— ${c.uptimePercent.toFixed(2)}% over 30 days</span>`;
+    return `
+      <div class="alert">
+        <span class="sev-dot ${dotClass}"></span>
+        <span class="alert-msg"><b>${c.name}</b> — ${stateText}${uptimeText}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+fetchStatus();
+setInterval(fetchStatus, 60000);
+</script>
+</body>
+</html>
