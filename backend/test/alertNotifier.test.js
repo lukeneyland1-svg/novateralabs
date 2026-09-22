@@ -28,6 +28,32 @@ function alert(overrides = {}) {
     };
 }
 
+test("buildDigestText summarizes the count and top repeated source IPs", () => {
+    const alerts = [
+        alert({ ip: "203.0.113.1", message: "one" }),
+        alert({ ip: "203.0.113.1", message: "two" }),
+        alert({ ip: "203.0.113.1", message: "three" }),
+        alert({ ip: "203.0.113.2", message: "four" }),
+    ];
+
+    const text = alertNotifier.buildDigestText(alerts);
+
+    assert.match(text, /^4 new alerts in this digest\./);
+    assert.match(text, /Top source IPs: 203\.0\.113\.1 \(3\), 203\.0\.113\.2 \(1\)/);
+    assert.match(text, /one/);
+    assert.match(text, /four/);
+});
+
+test("buildDigestText caps the listed lines and notes the remainder", () => {
+    const alerts = Array.from({ length: 55 }, (_, i) => alert({ message: `event-${i}`, timestamp: `2026-01-01T00:${String(i).padStart(2, "0")}:00.000Z` }));
+
+    const text = alertNotifier.buildDigestText(alerts);
+
+    assert.match(text, /event-0\b/);
+    assert.doesNotMatch(text, /event-50\b/); // 51st distinct event, past the 50-line cap
+    assert.match(text, /… and 5 more\./);
+});
+
 // Runs first, while the module-level rate limit is still untouched (lastSentAt
 // starts at 0), so this exercises the real send path instead of being skipped.
 test("does not throw when the mailer fails to send", async () => {
