@@ -52,3 +52,18 @@ test("content security policy restricts scripts/frames to same-origin, styles al
         assert.match(csp, /object-src 'none'/);
     });
 });
+
+// Real production bug: style.css pulls in Google Fonts via @import, which
+// was missed the first time by only grepping HTML files for external
+// src/href, not the CSS itself — caught by an actual browser CSP violation
+// on the live site, not by this test suite. Locking it in now so it can't
+// silently regress again.
+test("allows Google Fonts, since style.css @imports it", async () => {
+    await withTestServer(async (port) => {
+        const res = await fetch(`http://localhost:${port}/test`);
+        const csp = res.headers.get("content-security-policy");
+
+        assert.match(csp, /style-src[^;]*https:\/\/fonts\.googleapis\.com/);
+        assert.match(csp, /font-src[^;]*https:\/\/fonts\.gstatic\.com/);
+    });
+});
