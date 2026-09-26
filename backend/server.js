@@ -26,9 +26,16 @@ const requireAuth = require('./middleware/requireAuth');
 const requireAuthPage = require('./middleware/requireAuthPage');
 const requireOwner = require('./middleware/requireOwner');
 const requireSubscription = require('./middleware/requireSubscription');
+const securityHeaders = require('./middleware/securityHeaders');
+const enforceHttps = require('./middleware/enforceHttps');
 const scheduler = require('./scheduler');
 
 const app = express();
+// Before everything else, including cors: security headers should be on
+// every response (even an early redirect), and nothing downstream needs to
+// run before we've decided whether this request even gets to stay on HTTP.
+app.use(securityHeaders);
+app.use(enforceHttps);
 app.use(cors({ origin: true, credentials: true }));
 
 app.use(session({

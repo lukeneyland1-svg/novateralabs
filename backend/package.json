@@ -18,6 +18,7 @@
     "cron-parser": "^5.10.1",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
+    "helmet": "^8.3.0",
     "node-cron": "^4.6.0",
     "nodemailer": "^10.0.0",
     "otplib": "^13.5.0",

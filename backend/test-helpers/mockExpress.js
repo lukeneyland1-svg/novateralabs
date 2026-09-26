@@ -21,9 +21,14 @@ function mockRes() {
         res.body = payload;
         return res;
     };
-    res.redirect = (location) => {
-        res.statusCode = 302;
-        res.redirectedTo = location;
+    res.redirect = (statusOrLocation, maybeLocation) => {
+        if (typeof statusOrLocation === "number") {
+            res.statusCode = statusOrLocation;
+            res.redirectedTo = maybeLocation;
+        } else {
+            res.statusCode = 302;
+            res.redirectedTo = statusOrLocation;
+        }
         return res;
     };
     res.writeHead = (code, headers) => {
