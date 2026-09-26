@@ -10,7 +10,10 @@
 <body>
 <div class="app" style="display:flex;align-items:center;justify-content:center;min-height:90vh;">
   <div class="panel" style="width:100%;max-width:360px;">
-    <div class="panel-head"><h2>NovaTeraLabs</h2></div>
+    <div class="panel-head" style="display:flex;align-items:center;justify-content:space-between;">
+      <h2>NovaTeraLabs</h2>
+      <button type="button" id="loginCancelBtn" aria-label="Cancel and go back" style="background:none;border:none;color:var(--text-dim);font-size:22px;line-height:1;cursor:pointer;padding:0 0 0 12px;">×</button>
+    </div>
     <p style="color:var(--text-muted);font-size:13.5px;margin:-8px 0 20px;">Sign in to view the dashboard.</p>
     <form id="loginForm">
       <label style="display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);margin-bottom:14px;">
@@ -36,50 +39,6 @@
     <p style="margin:16px 0 0;text-align:center;"><a href="forgot-password.html" style="color:var(--text-dim);font-size:12.5px;">Forgot password?</a></p>
   </div>
 </div>
-<script>
-document.getElementById('loginForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const username = document.getElementById('username').value;
-  const password = document.getElementById('password').value;
-  const errorBox = document.getElementById('loginError');
-  try {
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error('Invalid credentials');
-    if (data.mfaRequired) {
-      document.getElementById('loginForm').style.display = 'none';
-      document.getElementById('mfaForm').style.display = 'block';
-      document.getElementById('mfaCode').focus();
-      return;
-    }
-    window.location.href = '/dashboard.html';
-  } catch (err) {
-    errorBox.textContent = 'Invalid username or password.';
-    errorBox.style.display = 'block';
-  }
-});
-
-document.getElementById('mfaForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const code = document.getElementById('mfaCode').value;
-  const errorBox = document.getElementById('mfaError');
-  try {
-    const res = await fetch('/api/auth/login/verify-mfa', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code }),
-    });
-    if (!res.ok) throw new Error('Invalid code');
-    window.location.href = '/dashboard.html';
-  } catch (err) {
-    errorBox.textContent = 'Invalid code. Please try again.';
-    errorBox.style.display = 'block';
-  }
-});
-</script>
+<script src="login.js"></script>
 </body>
 </html>
