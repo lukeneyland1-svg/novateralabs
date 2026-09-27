@@ -158,7 +158,9 @@ a{color:inherit;}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:#04101F;font-weight:600;box-shadow:0 0 16px var(--accent-glow);}
 .btn.primary:hover{opacity:.9;color:#04101F;box-shadow:0 0 22px var(--accent-glow);}
 .btn.small{padding:5px 10px;font-size:11px;}
-.btn.spinning{animation:spin .6s linear;}
+.btn:disabled{opacity:.6;cursor:default;}
+.refresh-icon{display:inline-block;}
+.refresh-icon.spinning{animation:spin .8s linear infinite;}
 @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
 
 .pill{font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:3px 9px;border-radius:20px;display:inline-flex;align-items:center;gap:5px;}

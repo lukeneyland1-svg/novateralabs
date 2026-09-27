@@ -270,16 +270,23 @@ async function fetchTasks(){
 }
 fetchTasks();
 
-document.getElementById('refreshBtn').addEventListener('click', (e) => {
-  e.currentTarget.classList.remove('spinning');
-  void e.currentTarget.offsetWidth;
-  e.currentTarget.classList.add('spinning');
-  fetchTasks();
-  fetchDashboard();
-  // No fetchAlerts() call: alerts arrive continuously over the live
-  // /api/security/stream connection (see connectAlertStream below), not via
-  // an on-demand fetch -- there was never such a function, which is why this
-  // threw a ReferenceError on every click.
+document.getElementById('refreshBtn').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  if (btn.disabled) return;
+  const icon = btn.querySelector('.refresh-icon');
+
+  btn.disabled = true;
+  icon.classList.add('spinning');
+  try {
+    // No fetchAlerts() call: alerts arrive continuously over the live
+    // /api/security/stream connection (see connectAlertStream below), not via
+    // an on-demand fetch -- there was never such a function, which is why this
+    // threw a ReferenceError on every click.
+    await Promise.all([fetchTasks(), fetchDashboard()]);
+  } finally {
+    icon.classList.remove('spinning');
+    btn.disabled = false;
+  }
 });
 
 /* ---------------- New automation modal ---------------- */
