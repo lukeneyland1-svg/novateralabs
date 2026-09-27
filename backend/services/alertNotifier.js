@@ -16,7 +16,16 @@ const RATE_LIMIT_MS = 6 * 60 * 60 * 1000;
 const PRUNE_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_LISTED_ALERTS = 50;
 
-let lastSentAt = 0;
+// Derived from the table itself rather than kept in a variable: an in-memory
+// value forgets on every process restart, which happens often enough during
+// active development that it was silently defeating the rate limit entirely
+// (each restart reset the clock to zero, forcing an immediate send). Every
+// row already carries the exact instant it was sent, so the most recent one
+// IS "last sent" — no separate state to fall out of sync.
+function getLastSentAt() {
+    const row = db.prepare("SELECT MAX(notified_at) AS lastSentAt FROM notified_alerts").get();
+    return row.lastSentAt ? new Date(row.lastSentAt).getTime() : 0;
+}
 
 function fingerprint(alert) {
     return crypto
@@ -73,7 +82,7 @@ exports.checkAndNotify = async (alerts) => {
         const fresh = notable.filter(a => !alreadyNotified.has(fingerprint(a)));
         if (fresh.length === 0) return;
 
-        if (Date.now() - lastSentAt < RATE_LIMIT_MS) {
+        if (Date.now() - getLastSentAt() < RATE_LIMIT_MS) {
             // Skip sending for now; leave these un-marked so they roll into the next digest.
             return;
         }
@@ -92,8 +101,6 @@ exports.checkAndNotify = async (alerts) => {
         const insert = db.prepare("INSERT OR IGNORE INTO notified_alerts (fingerprint, notified_at) VALUES (?, ?)");
         const now = new Date().toISOString();
         for (const alert of fresh) insert.run(fingerprint(alert), now);
-
-        lastSentAt = Date.now();
     } catch (err) {
         console.error("[alertNotifier] Failed to send alert digest:", err);
     }
@@ -101,10 +108,13 @@ exports.checkAndNotify = async (alerts) => {
 
 // Per-account version of the above, for non-owner accounts' own ingested
 // security events. Deliberately kept separate from checkAndNotify/
-// notified_alerts/lastSentAt above rather than sharing them — this way a
-// change here can't affect the owner's already-working alerting, and two
-// unrelated accounts' identically-fingerprinted alerts can't collide.
-const lastSentAtByAccount = new Map();
+// notified_alerts above rather than sharing them — this way a change here
+// can't affect the owner's already-working alerting, and two unrelated
+// accounts' identically-fingerprinted alerts can't collide.
+function getLastSentAtForAccount(userId) {
+    const row = db.prepare("SELECT MAX(notified_at) AS lastSentAt FROM account_notified_alerts WHERE user_id = ?").get(userId);
+    return row.lastSentAt ? new Date(row.lastSentAt).getTime() : 0;
+}
 
 function pruneOldAccountFingerprints(userId) {
     const cutoff = new Date(Date.now() - PRUNE_AFTER_MS).toISOString();
@@ -127,8 +137,7 @@ exports.checkAndNotifyAccount = async (userId, alerts) => {
         const fresh = notable.filter(a => !alreadyNotified.has(fingerprint(a)));
         if (fresh.length === 0) return;
 
-        const lastSent = lastSentAtByAccount.get(userId) || 0;
-        if (Date.now() - lastSent < RATE_LIMIT_MS) {
+        if (Date.now() - getLastSentAtForAccount(userId) < RATE_LIMIT_MS) {
             // Skip sending for now; leave these un-marked so they roll into the next digest.
             return;
         }
@@ -146,8 +155,6 @@ exports.checkAndNotifyAccount = async (userId, alerts) => {
         const insert = db.prepare("INSERT OR IGNORE INTO account_notified_alerts (user_id, fingerprint, notified_at) VALUES (?, ?, ?)");
         const now = new Date().toISOString();
         for (const alert of fresh) insert.run(userId, fingerprint(alert), now);
-
-        lastSentAtByAccount.set(userId, Date.now());
     } catch (err) {
         console.error(`[alertNotifier] Failed to send account alert digest for user ${userId}:`, err);
     }

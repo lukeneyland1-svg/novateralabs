@@ -116,6 +116,39 @@ test("rate-limits sends that happen within the cooldown window", async () => {
     assert.equal(rows.length, 1);
 });
 
+// The rate limit used to live in a plain JS variable, which forgets its
+// value on every process restart -- in production, restarting the server
+// (which happens routinely during deploys) silently reset the cooldown to
+// zero, letting the very next check send immediately regardless of how
+// recently a digest actually went out. Simulates a restart by discarding
+// only alertNotifier's own module cache (not the shared in-memory db, which
+// is exactly what survives a real restart) and reloading it fresh.
+test("rate limit survives a simulated process restart, unlike a plain in-memory variable", async () => {
+    // Clean slate: the rate limit is based on real wall-clock time, and
+    // earlier tests in this file already sent a real digest moments ago --
+    // without this, the "first" send below would itself already be
+    // rate-limited by that leftover state.
+    db.prepare("DELETE FROM notified_alerts").run();
+
+    let sendCount = 0;
+    fakeSendMail(async () => { sendCount += 1; });
+
+    const first = alert({ message: "restart-test-first", timestamp: "2026-01-01T00:20:00.000Z" });
+    await alertNotifier.checkAndNotify([first]);
+    assert.equal(sendCount, 1);
+
+    const alertNotifierPath = require.resolve("../services/alertNotifier");
+    delete require.cache[alertNotifierPath];
+    const reloadedAlertNotifier = require("../services/alertNotifier");
+
+    const second = alert({ message: "restart-test-second", timestamp: "2026-01-01T00:21:00.000Z" });
+    await reloadedAlertNotifier.checkAndNotify([second]);
+
+    // A plain in-memory lastSentAt would have reset to 0 on "restart" and let
+    // this second send straight through -- it must still be rate-limited.
+    assert.equal(sendCount, 1);
+});
+
 test("prunes notified fingerprints older than 7 days", async () => {
     const oldDate = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
     db.prepare("INSERT OR IGNORE INTO notified_alerts (fingerprint, notified_at) VALUES (?, ?)").run("stale-fingerprint", oldDate);
