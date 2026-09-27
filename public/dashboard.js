@@ -276,7 +276,10 @@ document.getElementById('refreshBtn').addEventListener('click', (e) => {
   e.currentTarget.classList.add('spinning');
   fetchTasks();
   fetchDashboard();
-  fetchAlerts();
+  // No fetchAlerts() call: alerts arrive continuously over the live
+  // /api/security/stream connection (see connectAlertStream below), not via
+  // an on-demand fetch -- there was never such a function, which is why this
+  // threw a ReferenceError on every click.
 });
 
 /* ---------------- New automation modal ---------------- */
