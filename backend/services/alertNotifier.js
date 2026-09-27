@@ -3,16 +3,16 @@ const db = require("../db");
 const { transporter, EMAIL_USER } = require("./mailer");
 const webhookNotifier = require("./webhookNotifier");
 
-// Was 5 minutes, then 1 hour — a public server's SSH port gets constant
-// background scanning from bots across the internet, and every attempt has a
-// distinct timestamp (so a distinct fingerprint), so even the 1-hour window
-// meant a digest fired roughly every hour, around the clock. 6 hours cuts
-// that further (~4/day instead of ~24/day) at the cost of a real event also
-// taking up to 6 hours to reach email/Slack — acceptable since every event
-// is still recorded immediately on the dashboard and in the compliance log
-// regardless of digest timing; this only delays the notification, not the
+// Was 5 minutes, then 1 hour, then 6 hours — a public server's SSH port gets
+// constant background scanning from bots across the internet, and every
+// attempt has a distinct timestamp (so a distinct fingerprint), so even the
+// 1-hour window meant a digest fired roughly every hour, around the clock.
+// 4 hours (~6/day) is the user's own preferred balance between inbox volume
+// and how stale a real event's notification can get — every event is still
+// recorded immediately on the dashboard and in the compliance log regardless
+// of digest timing either way; this only delays the notification, not the
 // record.
-const RATE_LIMIT_MS = 6 * 60 * 60 * 1000;
+const RATE_LIMIT_MS = 4 * 60 * 60 * 1000;
 const PRUNE_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_LISTED_ALERTS = 50;
 
