@@ -13,6 +13,8 @@ router.post("/metrics", requireApiKey, ingestController.reportMetrics);
 router.get("/metrics/mine", requireAuth, requireSubscription, ingestController.getMyMetrics);
 router.post("/security-events", requireApiKey, ingestController.reportSecurityEvents);
 router.get("/security-events/mine", requireAuth, requireSubscription, ingestController.getMySecurityEvents);
+router.post("/packages", requireApiKey, ingestController.reportPackages);
+router.get("/cve-findings/mine", requireAuth, requireSubscription, ingestController.getMyCveFindings);
 router.get("/key", requireAuth, requireSubscription, ingestController.getApiKey);
 router.post("/key/regenerate", requireAuth, requireSubscription, ingestController.regenerateApiKey);
 

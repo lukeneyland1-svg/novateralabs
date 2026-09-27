@@ -551,9 +551,35 @@ async function fetchMySecurityEvents(){
   }
 }
 
+function renderCveFindingsFeed(findings){
+  const feed = document.getElementById('cveFindingsFeed');
+  if(!findings.length){
+    feed.innerHTML = `<div class="alert"><span class="sev-dot low"></span><span class="alert-time">—</span><span class="alert-msg">No known vulnerabilities found.</span></div>`;
+    return;
+  }
+  feed.innerHTML = findings.slice(0, 12).map(f => `
+    <div class="alert">
+      <span class="sev-dot warn"></span>
+      <span class="alert-time">${relativeTime(f.firstSeenAt)}</span>
+      <span class="alert-msg"><b>${escapeHtml(f.cveId)}</b> — ${escapeHtml(f.packageName)} ${escapeHtml(f.packageVersion)}${f.summary ? `: ${escapeHtml(f.summary)}` : ''}</span>
+    </div>
+  `).join('');
+}
+
+async function fetchMyCveFindings(){
+  try{
+    const res = await fetch('/api/ingest/cve-findings/mine');
+    const data = await res.json();
+    renderCveFindingsFeed(data.findings || []);
+  } catch(err){
+    console.error('CVE findings fetch failed:', err);
+  }
+}
+
 function pollIngestData(){
   fetchMyMetrics();
   fetchMySecurityEvents();
+  fetchMyCveFindings();
 }
 pollIngestData();
 setInterval(pollIngestData, 15000);

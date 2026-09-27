@@ -226,6 +226,160 @@ test("reportSecurityEvents stores threat-intel reputation for a public IP", asyn
     assert.equal(stored.countryCode, "CN");
 });
 
+// ---- reportPackages / getMyCveFindings ----
+
+const cveUserId = db.prepare("INSERT INTO users (username, password_hash, api_key, email) VALUES (?, ?, ?, ?)")
+    .run("cve-account", bcrypt.hashSync("password000", 10), "key-cve", "cve-account@example.com").lastInsertRowid;
+
+function fakeOsvFetch(impl) {
+    const originalFetch = global.fetch;
+    global.fetch = impl;
+    return () => { global.fetch = originalFetch; };
+}
+
+function osvResponse(vulns) {
+    return { ok: true, status: 200, json: async () => ({ vulns }) };
+}
+
+test("reportPackages rejects a malformed body", async () => {
+    const req = mockReq({ body: { os: "debian", release: "13" /* missing packages */ } });
+    req.apiUserId = cveUserId;
+    const res = mockRes();
+
+    await ingestController.reportPackages(req, res);
+
+    assert.equal(res.statusCode, 400);
+});
+
+test("reportPackages rejects an oversized batch", async () => {
+    const req = mockReq({ body: { os: "debian", release: "13", packages: Array.from({ length: 51 }, () => ({ name: "x", version: "1" })) } });
+    req.apiUserId = cveUserId;
+    const res = mockRes();
+
+    await ingestController.reportPackages(req, res);
+
+    assert.equal(res.statusCode, 400);
+});
+
+test("reportPackages rejects a malformed package entry", async () => {
+    const req = mockReq({ body: { os: "debian", release: "13", packages: [{ name: "openssl" }] } });
+    req.apiUserId = cveUserId;
+    const res = mockRes();
+
+    await ingestController.reportPackages(req, res);
+
+    assert.equal(res.statusCode, 400);
+});
+
+test("reportPackages stores a new finding and emails the reporting account", async () => {
+    const restoreFetch = fakeOsvFetch(async () => osvResponse([
+        { id: "DLA-3942-1", summary: "openssl - security update", upstream: ["CVE-2023-5678"] },
+    ]));
+    let sentWith = null;
+    const originalSendMail = mailer.transporter.sendMail;
+    mailer.transporter.sendMail = async (opts) => { sentWith = opts; };
+
+    const req = mockReq({ body: { os: "debian", release: "11", packages: [{ name: "openssl", version: "1.1.1n-0+deb11u3" }] } });
+    req.apiUserId = cveUserId;
+    const res = mockRes();
+    await ingestController.reportPackages(req, res);
+
+    restoreFetch();
+    mailer.transporter.sendMail = originalSendMail;
+
+    assert.deepEqual(res.body, { success: true, checked: true, findingsCount: 1 });
+
+    const row = db.prepare("SELECT * FROM cve_findings WHERE user_id = ?").get(cveUserId);
+    assert.equal(row.cve_id, "CVE-2023-5678");
+    assert.equal(row.package_name, "openssl");
+    assert.equal(row.first_seen_at, row.last_seen_at);
+
+    assert.ok(sentWith, "expected an email to have been sent for a new finding");
+    assert.equal(sentWith.to, "cve-account@example.com");
+    assert.match(sentWith.text, /CVE-2023-5678/);
+});
+
+test("reportPackages is rate-limited to once per day and does not call OSV again immediately", async () => {
+    let called = false;
+    const restoreFetch = fakeOsvFetch(async () => { called = true; return osvResponse([]); });
+
+    const req = mockReq({ body: { os: "debian", release: "11", packages: [{ name: "openssl", version: "1.1.1n-0+deb11u3" }] } });
+    req.apiUserId = cveUserId;
+    const res = mockRes();
+    await ingestController.reportPackages(req, res);
+
+    restoreFetch();
+
+    assert.equal(called, false);
+    assert.deepEqual(res.body, { success: true, checked: false });
+});
+
+test("reportPackages preserves first_seen_at and does not re-email for a still-present finding", async () => {
+    // Simulate the 24h window having passed by backdating last_cve_check_at directly,
+    // the same technique used elsewhere in this suite to test time-based behavior.
+    const oldCheck = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+    db.prepare("UPDATE users SET last_cve_check_at = ? WHERE id = ?").run(oldCheck, cveUserId);
+    const originalFirstSeenAt = db.prepare("SELECT first_seen_at FROM cve_findings WHERE user_id = ?").get(cveUserId).first_seen_at;
+
+    const restoreFetch = fakeOsvFetch(async () => osvResponse([
+        { id: "DLA-3942-1", summary: "openssl - security update", upstream: ["CVE-2023-5678"] },
+    ]));
+    let called = false;
+    const originalSendMail = mailer.transporter.sendMail;
+    mailer.transporter.sendMail = async () => { called = true; };
+
+    const req = mockReq({ body: { os: "debian", release: "11", packages: [{ name: "openssl", version: "1.1.1n-0+deb11u3" }] } });
+    req.apiUserId = cveUserId;
+    await ingestController.reportPackages(req, mockRes());
+
+    restoreFetch();
+    mailer.transporter.sendMail = originalSendMail;
+
+    assert.equal(called, false, "an already-known finding should not trigger a second email");
+
+    const row = db.prepare("SELECT * FROM cve_findings WHERE user_id = ?").get(cveUserId);
+    assert.equal(row.first_seen_at, originalFirstSeenAt, "first_seen_at must not change on re-confirmation");
+});
+
+test("reportPackages removes a finding once the package is no longer reported as vulnerable", async () => {
+    const oldCheck = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+    db.prepare("UPDATE users SET last_cve_check_at = ? WHERE id = ?").run(oldCheck, cveUserId);
+
+    const restoreFetch = fakeOsvFetch(async () => osvResponse([])); // package was upgraded, now clean
+
+    const req = mockReq({ body: { os: "debian", release: "11", packages: [{ name: "openssl", version: "1.1.1n-0+deb11u6" }] } });
+    req.apiUserId = cveUserId;
+    await ingestController.reportPackages(req, mockRes());
+
+    restoreFetch();
+
+    const rows = db.prepare("SELECT * FROM cve_findings WHERE user_id = ?").all(cveUserId);
+    assert.deepEqual(rows, []);
+});
+
+test("getMyCveFindings returns the current account's own findings and never another account's", async () => {
+    const oldCheck = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+    db.prepare("UPDATE users SET last_cve_check_at = ? WHERE id = ?").run(oldCheck, cveUserId);
+    const restoreFetch = fakeOsvFetch(async () => osvResponse([
+        { id: "DLA-9999-1", summary: "fresh finding", upstream: ["CVE-2025-9999"] },
+    ]));
+    const req = mockReq({ body: { os: "debian", release: "11", packages: [{ name: "openssl", version: "1.1.1n-0+deb11u3" }] } });
+    req.apiUserId = cveUserId;
+    await ingestController.reportPackages(req, mockRes());
+    restoreFetch();
+
+    const reqCve = mockReq({ session: { userId: cveUserId } });
+    const resCve = mockRes();
+    ingestController.getMyCveFindings(reqCve, resCve);
+    assert.equal(resCve.body.findings.length, 1);
+    assert.equal(resCve.body.findings[0].cveId, "CVE-2025-9999");
+
+    const reqB = mockReq({ session: { userId: userBId } });
+    const resB = mockRes();
+    ingestController.getMyCveFindings(reqB, resB);
+    assert.deepEqual(resB.body.findings, []);
+});
+
 test("reportSecurityEvents stores no reputation for a private IP and never calls fetch", async () => {
     let called = false;
     const originalFetch = global.fetch;

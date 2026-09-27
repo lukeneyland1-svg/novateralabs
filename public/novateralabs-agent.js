@@ -18,10 +18,21 @@
 const os = require("os");
 const https = require("https");
 const fsp = require("fs/promises");
+const { execFile } = require("child_process");
+const { promisify } = require("util");
+const execFileAsync = promisify(execFile);
 
 const API_KEY = process.env.NOVATERALABS_API_KEY;
 const HOST = "novateralabs.com";
 const LINUX_LOG_PATHS = ["/var/log/auth.log", "/var/log/secure"];
+
+// A focused, curated set of high-signal, security-relevant packages rather
+// than every installed package -- see the dashboard's CVE panel for why.
+const CURATED_PACKAGES = [
+    "openssh-server", "openssl", "sudo", "curl", "wget", "bash",
+    "nginx", "apache2", "mysql-server", "postgresql", "docker.io",
+    "python3", "libc6", "systemd",
+];
 
 if (!API_KEY) {
     console.error("Missing NOVATERALABS_API_KEY environment variable.");
@@ -157,8 +168,71 @@ async function reportSecurityEvents() {
     console.log(`Reported ${events.length} security event(s) successfully.`);
 }
 
+// ── Installed-package reporting for CVE scanning ──────────────────────────────
+// Debian-family only for now (see backend/services/cveScanner.js for why:
+// OSV's Debian ecosystem strings are release-qualified, Ubuntu needs an
+// additional LTS qualifier and isn't supported yet). Anything else, this
+// quietly skips rather than guessing at an ecosystem string.
+async function readOsRelease() {
+    try {
+        const content = await fsp.readFile("/etc/os-release", "utf8");
+        const info = {};
+        for (const line of content.split("\n")) {
+            const match = line.match(/^([A-Z_]+)=(.*)$/);
+            if (match) info[match[1]] = match[2].replace(/^"|"$/g, "");
+        }
+        return { id: info.ID, versionId: info.VERSION_ID };
+    } catch {
+        return null;
+    }
+}
+
+function parsePackageOutput(stdout) {
+    return stdout
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => {
+            const [name, version] = line.split("\t");
+            return name && version ? { name, version } : null;
+        })
+        .filter(Boolean);
+}
+
+async function getInstalledPackages() {
+    try {
+        const { stdout } = await execFileAsync("dpkg-query", ["-W", "-f=${Package}\t${Version}\n", ...CURATED_PACKAGES]);
+        return parsePackageOutput(stdout);
+    } catch (err) {
+        // dpkg-query exits non-zero whenever ANY requested package isn't
+        // installed, even though it still printed the ones it did find to
+        // stdout -- verified directly against a real Debian machine before
+        // writing this (Node's execFile attaches stdout to the error object
+        // even on a non-zero exit, also verified directly rather than
+        // assumed). A partial miss here isn't a real failure.
+        if (typeof err.stdout === "string") return parsePackageOutput(err.stdout);
+        return [];
+    }
+}
+
+async function reportInstalledPackages() {
+    const osRelease = await readOsRelease();
+    if (!osRelease || osRelease.id !== "debian") {
+        console.log("Skipping CVE package report — this agent only supports Debian-family systems for now.");
+        return;
+    }
+
+    const packages = await getInstalledPackages();
+    if (packages.length === 0) {
+        console.log("No curated packages found installed — skipping CVE package report.");
+        return;
+    }
+
+    await postJson("/api/ingest/packages", { os: "debian", release: osRelease.versionId, packages });
+    console.log(`Reported ${packages.length} package(s) for CVE checking.`);
+}
+
 (async () => {
-    const results = await Promise.allSettled([reportMetrics(), reportSecurityEvents()]);
+    const results = await Promise.allSettled([reportMetrics(), reportSecurityEvents(), reportInstalledPackages()]);
     let failed = false;
     for (const result of results) {
         if (result.status === "rejected") {

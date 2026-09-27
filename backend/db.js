@@ -63,6 +63,7 @@ try { db.exec("ALTER TABLE users ADD COLUMN subscription_status TEXT NOT NULL DE
 try { db.exec("ALTER TABLE users ADD COLUMN stripe_customer_id TEXT"); } catch (e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN stripe_subscription_id TEXT"); } catch (e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN scan_target TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN last_cve_check_at TEXT"); } catch (e) {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS password_resets (
@@ -140,6 +141,26 @@ db.exec(`
   )
 `);
 db.exec("CREATE INDEX IF NOT EXISTS idx_compliance_log_user_time ON compliance_log(user_id, timestamp)");
+
+// Unlike security_events (replaced wholesale on every agent report, matching
+// auth-log "current tail" semantics), CVE findings need to persist until
+// actually fixed -- upserted (first_seen_at preserved, last_seen_at bumped)
+// rather than replaced, and explicitly deleted once a package is no longer
+// vulnerable. See ingestController.reportPackages.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS cve_findings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    package_name TEXT NOT NULL,
+    package_version TEXT NOT NULL,
+    cve_id TEXT NOT NULL,
+    summary TEXT,
+    first_seen_at TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL,
+    UNIQUE(user_id, package_name, cve_id)
+  )
+`);
+db.exec("CREATE INDEX IF NOT EXISTS idx_cve_findings_user ON cve_findings(user_id)");
 
 // Every account needs its own API key for the agent/data-ingestion pipeline.
 // Each row needs a distinct random value, so this can't be a single UPDATE.
