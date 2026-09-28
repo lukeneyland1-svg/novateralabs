@@ -223,6 +223,25 @@ test("checkAndNotifyAccount rate-limits repeated sends per account within the co
     assert.equal(called, false);
 });
 
+// Real bug caught by an actual end-to-end test of the CVE scanner: sharing
+// one clock between security-event alerts and CVE alerts for the same
+// account meant whichever one's digest sent first silently starved the
+// other, since both normally arrive from the same agent run moments apart.
+test("checkAndNotifyAccountForCve is NOT blocked by checkAndNotifyAccount's cooldown for the same account", async () => {
+    // Account A is already inside checkAndNotifyAccount's cooldown window
+    // (confirmed by the test directly above this one) -- a CVE-shaped alert
+    // for the same account, right now, must still go through.
+    let sentWith = null;
+    fakeSendMail(async (opts) => { sentWith = opts; });
+
+    await alertNotifier.checkAndNotifyAccountForCve(accountAId, [
+        alert({ source: "cve-scan", type: "CVE Finding", message: "openssl 1.0 is vulnerable to CVE-2099-1" }),
+    ]);
+
+    assert.ok(sentWith, "the CVE digest must not be starved by the security-event digest's cooldown");
+    assert.equal(sentWith.to, "account-a@example.com");
+});
+
 test("checkAndNotifyAccount prunes fingerprints older than 7 days for that account", async () => {
     const oldDate = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
     db.prepare("INSERT OR IGNORE INTO account_notified_alerts (user_id, fingerprint, notified_at) VALUES (?, ?, ?)")

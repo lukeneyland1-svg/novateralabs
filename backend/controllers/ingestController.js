@@ -193,7 +193,11 @@ exports.reportPackages = async (req, res) => {
                 ip: null,
             }));
             complianceLog.recordEvents(req.apiUserId, alerts);
-            alertNotifier.checkAndNotifyAccount(req.apiUserId, alerts);
+            // Its own notify path (separate rate-limit clock from security
+            // events) -- confirmed via a real end-to-end test that sharing
+            // checkAndNotifyAccount's clock let one report starve the other
+            // when both arrive from the same agent run moments apart.
+            alertNotifier.checkAndNotifyAccountForCve(req.apiUserId, alerts);
         }
 
         res.json({ success: true, checked: true, findingsCount: findings.length });

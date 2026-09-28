@@ -42,6 +42,22 @@ db.exec(`
   )
 `);
 
+// Deliberately separate from account_notified_alerts, not shared: a real
+// end-to-end test caught that sharing one table/rate-limit clock between
+// security-event alerts and CVE alerts for the same account created a race
+// -- whichever report's digest happened to send first "used up" the shared
+// cooldown, silently starving the other. Same table shape, independent
+// rate-limit clock, so CVE findings can't be starved by security-event
+// noise (or vice versa). See alertNotifier.checkAndNotifyAccountForCve.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS account_notified_cve_alerts (
+    user_id INTEGER NOT NULL,
+    fingerprint TEXT NOT NULL,
+    notified_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, fingerprint)
+  )
+`);
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

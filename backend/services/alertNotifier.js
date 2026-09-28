@@ -159,3 +159,59 @@ exports.checkAndNotifyAccount = async (userId, alerts) => {
         console.error(`[alertNotifier] Failed to send account alert digest for user ${userId}:`, err);
     }
 };
+
+// CVE-finding version of the above. Deliberately its own table/rate-limit
+// clock, not shared with checkAndNotifyAccount -- a real end-to-end test of
+// the CVE scanner caught that sharing one clock meant whichever report (auth-
+// log security events or CVE findings) happened to reach the server first
+// would "use up" the account's cooldown and silently starve the other, since
+// both usually arrive from the same agent run moments apart. This is the
+// exact same reasoning as keeping this file's owner-path and account-path
+// state separate above, applied one level deeper.
+function getLastSentAtForAccountCve(userId) {
+    const row = db.prepare("SELECT MAX(notified_at) AS lastSentAt FROM account_notified_cve_alerts WHERE user_id = ?").get(userId);
+    return row.lastSentAt ? new Date(row.lastSentAt).getTime() : 0;
+}
+
+function pruneOldAccountCveFingerprints(userId) {
+    const cutoff = new Date(Date.now() - PRUNE_AFTER_MS).toISOString();
+    db.prepare("DELETE FROM account_notified_cve_alerts WHERE user_id = ? AND notified_at < ?").run(userId, cutoff);
+}
+
+exports.checkAndNotifyAccountForCve = async (userId, alerts) => {
+    try {
+        pruneOldAccountCveFingerprints(userId);
+
+        const notable = alerts.filter(a => a.severity === "critical" || a.severity === "high");
+        if (notable.length === 0) return;
+
+        const user = db.prepare("SELECT email FROM users WHERE id = ?").get(userId);
+        if (!user || !user.email) return;
+
+        const alreadyNotified = new Set(
+            db.prepare("SELECT fingerprint FROM account_notified_cve_alerts WHERE user_id = ?").all(userId).map(r => r.fingerprint)
+        );
+        const fresh = notable.filter(a => !alreadyNotified.has(fingerprint(a)));
+        if (fresh.length === 0) return;
+
+        if (Date.now() - getLastSentAtForAccountCve(userId) < RATE_LIMIT_MS) {
+            return;
+        }
+
+        const subject = `🚨 ${fresh.length} critical security alert${fresh.length === 1 ? "" : "s"} — NovaTeraLabs`;
+        const text = buildDigestText(fresh);
+
+        await transporter.sendMail({
+            from: `"NovaTeraLabs Security" <${EMAIL_USER}>`,
+            to: user.email,
+            subject,
+            text,
+        });
+
+        const insert = db.prepare("INSERT OR IGNORE INTO account_notified_cve_alerts (user_id, fingerprint, notified_at) VALUES (?, ?, ?)");
+        const now = new Date().toISOString();
+        for (const alert of fresh) insert.run(userId, fingerprint(alert), now);
+    } catch (err) {
+        console.error(`[alertNotifier] Failed to send account CVE alert digest for user ${userId}:`, err);
+    }
+};
