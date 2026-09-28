@@ -509,6 +509,51 @@ document.getElementById('ingestRegenerateBtn').addEventListener('click', async (
   }
 });
 
+function showWebhookStatus(message, isError){
+  const box = document.getElementById('webhookStatus');
+  box.textContent = message;
+  box.style.color = isError ? 'var(--crit)' : 'var(--accent)';
+  box.style.display = 'block';
+}
+
+async function fetchWebhookUrl(){
+  try{
+    const res = await fetch('/api/ingest/webhook');
+    const data = await res.json();
+    document.getElementById('webhookUrlInput').value = data.webhookUrl || '';
+  } catch(err){
+    console.error('Webhook URL fetch failed:', err);
+  }
+}
+fetchWebhookUrl();
+
+document.getElementById('webhookSaveBtn').addEventListener('click', async () => {
+  const webhookUrl = document.getElementById('webhookUrlInput').value.trim();
+  try{
+    const res = await fetch('/api/ingest/webhook', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ webhookUrl }),
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Could not save webhook URL.');
+    showWebhookStatus(webhookUrl ? 'Webhook URL saved.' : 'Webhook URL cleared.', false);
+  } catch(err){
+    showWebhookStatus(err.message, true);
+  }
+});
+
+document.getElementById('webhookTestBtn').addEventListener('click', async () => {
+  try{
+    const res = await fetch('/api/ingest/webhook/test', { method: 'POST' });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Test failed.');
+    showWebhookStatus('Test message sent — check your webhook destination.', false);
+  } catch(err){
+    showWebhookStatus(err.message, true);
+  }
+});
+
 async function fetchMyMetrics(){
   try{
     const res = await fetch('/api/ingest/metrics/mine');

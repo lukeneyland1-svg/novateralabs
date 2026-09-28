@@ -4,6 +4,7 @@ const alertNotifier = require("../services/alertNotifier");
 const threatIntel = require("../services/threatIntel");
 const complianceLog = require("../services/complianceLog");
 const cveScanner = require("../services/cveScanner");
+const webhookNotifier = require("../services/webhookNotifier");
 
 exports.reportMetrics = (req, res) => {
     try {
@@ -218,6 +219,49 @@ exports.getMyCveFindings = (req, res) => {
         res.json({ findings });
     } catch (err) {
         console.error("CVE findings read error:", err);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+
+function isValidWebhookUrl(url) {
+    try {
+        const parsed = new URL(url);
+        return parsed.protocol === "http:" || parsed.protocol === "https:";
+    } catch {
+        return false;
+    }
+}
+
+exports.getWebhookUrl = (req, res) => {
+    const user = db.prepare("SELECT webhook_url FROM users WHERE id = ?").get(req.session.userId);
+    res.json({ webhookUrl: user.webhook_url || null });
+};
+
+exports.setWebhookUrl = (req, res) => {
+    const { webhookUrl } = req.body;
+    if (webhookUrl && !isValidWebhookUrl(webhookUrl)) {
+        return res.status(400).json({ error: "webhookUrl must be a valid http(s) URL, or empty to clear it." });
+    }
+    db.prepare("UPDATE users SET webhook_url = ? WHERE id = ?").run(webhookUrl || null, req.session.userId);
+    res.json({ webhookUrl: webhookUrl || null });
+};
+
+exports.testWebhook = async (req, res) => {
+    try {
+        const user = db.prepare("SELECT webhook_url FROM users WHERE id = ?").get(req.session.userId);
+        if (!user.webhook_url) {
+            return res.status(400).json({ error: "No webhook URL saved yet." });
+        }
+        const ok = await webhookNotifier.sendToWebhook(
+            "Test alert from NovaTeraLabs — if you can see this, your webhook is configured correctly.",
+            user.webhook_url
+        );
+        if (!ok) {
+            return res.status(502).json({ error: "Could not deliver a test message to that URL. Double-check it's correct." });
+        }
+        res.json({ success: true });
+    } catch (err) {
+        console.error("Webhook test error:", err);
         res.status(500).json({ error: "Internal Server Error" });
     }
 };

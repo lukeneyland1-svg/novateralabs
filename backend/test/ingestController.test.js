@@ -400,3 +400,92 @@ test("reportSecurityEvents stores no reputation for a private IP and never calls
     assert.equal(stored.isMalicious, false);
     assert.equal(stored.abuseScore, null);
 });
+
+// ---- webhook get/set/test ----
+
+test("getWebhookUrl returns null when the account hasn't set one", () => {
+    const req = mockReq({ session: { userId: userBId } });
+    const res = mockRes();
+
+    ingestController.getWebhookUrl(req, res);
+
+    assert.deepEqual(res.body, { webhookUrl: null });
+});
+
+test("setWebhookUrl rejects a malformed URL", () => {
+    const req = mockReq({ session: { userId: userBId }, body: { webhookUrl: "not-a-url" } });
+    const res = mockRes();
+
+    ingestController.setWebhookUrl(req, res);
+
+    assert.equal(res.statusCode, 400);
+});
+
+test("setWebhookUrl rejects a non-http(s) URL", () => {
+    const req = mockReq({ session: { userId: userBId }, body: { webhookUrl: "ftp://example.com" } });
+    const res = mockRes();
+
+    ingestController.setWebhookUrl(req, res);
+
+    assert.equal(res.statusCode, 400);
+});
+
+test("setWebhookUrl saves a valid URL and getWebhookUrl then returns it", () => {
+    const setReq = mockReq({ session: { userId: userBId }, body: { webhookUrl: "https://hooks.slack.com/services/xyz" } });
+    ingestController.setWebhookUrl(setReq, mockRes());
+
+    const getReq = mockReq({ session: { userId: userBId } });
+    const getRes = mockRes();
+    ingestController.getWebhookUrl(getReq, getRes);
+
+    assert.deepEqual(getRes.body, { webhookUrl: "https://hooks.slack.com/services/xyz" });
+});
+
+test("setWebhookUrl clears a saved URL when given an empty string", () => {
+    const clearReq = mockReq({ session: { userId: userBId }, body: { webhookUrl: "" } });
+    ingestController.setWebhookUrl(clearReq, mockRes());
+
+    const getReq = mockReq({ session: { userId: userBId } });
+    const getRes = mockRes();
+    ingestController.getWebhookUrl(getReq, getRes);
+
+    assert.deepEqual(getRes.body, { webhookUrl: null });
+});
+
+test("testWebhook rejects when the account has no webhook URL saved", async () => {
+    const req = mockReq({ session: { userId: userAId } });
+    const res = mockRes();
+
+    await ingestController.testWebhook(req, res);
+
+    assert.equal(res.statusCode, 400);
+});
+
+test("testWebhook sends a real test message and reports success", async () => {
+    const setReq = mockReq({ session: { userId: userAId }, body: { webhookUrl: "https://hooks.slack.test/for-testing" } });
+    ingestController.setWebhookUrl(setReq, mockRes());
+
+    let capturedBody = null;
+    const originalFetch = global.fetch;
+    global.fetch = async (url, options) => { capturedBody = JSON.parse(options.body); return { ok: true, status: 200 }; };
+
+    const req = mockReq({ session: { userId: userAId } });
+    const res = mockRes();
+    await ingestController.testWebhook(req, res);
+
+    global.fetch = originalFetch;
+    assert.deepEqual(res.body, { success: true });
+    assert.match(capturedBody.text, /Test alert from NovaTeraLabs/);
+});
+
+test("testWebhook reports failure when the URL can't actually be reached", async () => {
+    const req = mockReq({ session: { userId: userAId } }); // still has the URL saved from the previous test
+    const originalFetch = global.fetch;
+    global.fetch = async () => { throw new Error("network down"); };
+
+    const res = mockRes();
+    await ingestController.testWebhook(req, res);
+
+    global.fetch = originalFetch;
+    assert.equal(res.statusCode, 502);
+});

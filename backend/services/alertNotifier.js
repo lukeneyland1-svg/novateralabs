@@ -96,7 +96,11 @@ exports.checkAndNotify = async (alerts) => {
             subject,
             text,
         });
-        webhookNotifier.sendToWebhook(`*${subject}*\n${text}`);
+        // The owner's webhook now lives on their own users.webhook_url row,
+        // same as every other account, rather than a secrets.js-only value —
+        // set via the dashboard like anyone else's.
+        const owner = db.prepare("SELECT webhook_url FROM users WHERE is_owner = 1").get();
+        webhookNotifier.sendToWebhook(`*${subject}*\n${text}`, owner && owner.webhook_url);
 
         const insert = db.prepare("INSERT OR IGNORE INTO notified_alerts (fingerprint, notified_at) VALUES (?, ?)");
         const now = new Date().toISOString();
@@ -128,7 +132,7 @@ exports.checkAndNotifyAccount = async (userId, alerts) => {
         const notable = alerts.filter(a => a.severity === "critical" || a.severity === "high");
         if (notable.length === 0) return;
 
-        const user = db.prepare("SELECT email FROM users WHERE id = ?").get(userId);
+        const user = db.prepare("SELECT email, webhook_url FROM users WHERE id = ?").get(userId);
         if (!user || !user.email) return;
 
         const alreadyNotified = new Set(
@@ -151,6 +155,7 @@ exports.checkAndNotifyAccount = async (userId, alerts) => {
             subject,
             text,
         });
+        webhookNotifier.sendToWebhook(`*${subject}*\n${text}`, user.webhook_url);
 
         const insert = db.prepare("INSERT OR IGNORE INTO account_notified_alerts (user_id, fingerprint, notified_at) VALUES (?, ?, ?)");
         const now = new Date().toISOString();
@@ -185,7 +190,7 @@ exports.checkAndNotifyAccountForCve = async (userId, alerts) => {
         const notable = alerts.filter(a => a.severity === "critical" || a.severity === "high");
         if (notable.length === 0) return;
 
-        const user = db.prepare("SELECT email FROM users WHERE id = ?").get(userId);
+        const user = db.prepare("SELECT email, webhook_url FROM users WHERE id = ?").get(userId);
         if (!user || !user.email) return;
 
         const alreadyNotified = new Set(
@@ -207,6 +212,7 @@ exports.checkAndNotifyAccountForCve = async (userId, alerts) => {
             subject,
             text,
         });
+        webhookNotifier.sendToWebhook(`*${subject}*\n${text}`, user.webhook_url);
 
         const insert = db.prepare("INSERT OR IGNORE INTO account_notified_cve_alerts (user_id, fingerprint, notified_at) VALUES (?, ?, ?)");
         const now = new Date().toISOString();

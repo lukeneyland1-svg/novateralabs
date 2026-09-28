@@ -80,6 +80,7 @@ try { db.exec("ALTER TABLE users ADD COLUMN stripe_customer_id TEXT"); } catch (
 try { db.exec("ALTER TABLE users ADD COLUMN stripe_subscription_id TEXT"); } catch (e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN scan_target TEXT"); } catch (e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN last_cve_check_at TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN webhook_url TEXT"); } catch (e) {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS password_resets (

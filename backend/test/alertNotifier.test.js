@@ -149,6 +149,23 @@ test("rate limit survives a simulated process restart, unlike a plain in-memory 
     assert.equal(sendCount, 1);
 });
 
+test("checkAndNotify posts to the owner's webhook_url when one is set", async () => {
+    db.prepare("DELETE FROM notified_alerts").run();
+    fakeSendMail(async () => {});
+
+    db.prepare("INSERT INTO users (username, password_hash, is_owner, webhook_url) VALUES (?, ?, 1, ?)")
+        .run("webhook-owner", "hash", "https://hooks.slack.test/owner");
+
+    let capturedUrl = null;
+    const originalFetch = global.fetch;
+    global.fetch = async (url) => { capturedUrl = url; return { ok: true, status: 200 }; };
+
+    await alertNotifier.checkAndNotify([alert({ message: "webhook test alert" })]);
+
+    global.fetch = originalFetch;
+    assert.equal(capturedUrl, "https://hooks.slack.test/owner");
+});
+
 test("prunes notified fingerprints older than 7 days", async () => {
     const oldDate = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
     db.prepare("INSERT OR IGNORE INTO notified_alerts (fingerprint, notified_at) VALUES (?, ?)").run("stale-fingerprint", oldDate);
@@ -252,4 +269,53 @@ test("checkAndNotifyAccount prunes fingerprints older than 7 days for that accou
 
     const fingerprints = db.prepare("SELECT fingerprint FROM account_notified_alerts WHERE user_id = ?").all(accountAId).map(r => r.fingerprint);
     assert.ok(!fingerprints.includes("stale-account-fingerprint"));
+});
+
+// ---- Per-account webhook_url (checkAndNotifyAccount / checkAndNotifyAccountForCve) ----
+
+const webhookAccountId = db.prepare("INSERT INTO users (username, password_hash, email, webhook_url) VALUES (?, ?, ?, ?)")
+    .run("webhook-account", "hash", "webhook-account@example.com", "https://hooks.slack.test/account").lastInsertRowid;
+
+test("checkAndNotifyAccount posts to the account's own webhook_url when one is set", async () => {
+    fakeSendMail(async () => {});
+    let capturedUrl = null;
+    const originalFetch = global.fetch;
+    global.fetch = async (url) => { capturedUrl = url; return { ok: true, status: 200 }; };
+
+    await alertNotifier.checkAndNotifyAccount(webhookAccountId, [alert({ message: "webhook account security event" })]);
+
+    global.fetch = originalFetch;
+    assert.equal(capturedUrl, "https://hooks.slack.test/account");
+});
+
+test("checkAndNotifyAccountForCve posts to the account's own webhook_url when one is set", async () => {
+    fakeSendMail(async () => {});
+    let capturedUrl = null;
+    const originalFetch = global.fetch;
+    global.fetch = async (url) => { capturedUrl = url; return { ok: true, status: 200 }; };
+
+    await alertNotifier.checkAndNotifyAccountForCve(webhookAccountId, [
+        alert({ source: "cve-scan", type: "CVE Finding", message: "webhook account cve finding" }),
+    ]);
+
+    global.fetch = originalFetch;
+    assert.equal(capturedUrl, "https://hooks.slack.test/account");
+});
+
+test("checkAndNotifyAccount does not call fetch when the account has no webhook_url set", async () => {
+    // A brand-new account with no prior sends -- accountB already sent once
+    // earlier in this file and would be rate-limited by now, which would
+    // make fetch not being called a false positive for the wrong reason.
+    const noWebhookId = db.prepare("INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)")
+        .run("no-webhook-account", "hash", "no-webhook@example.com").lastInsertRowid;
+
+    fakeSendMail(async () => {});
+    let called = false;
+    const originalFetch = global.fetch;
+    global.fetch = async () => { called = true; return { ok: true, status: 200 }; };
+
+    await alertNotifier.checkAndNotifyAccount(noWebhookId, [alert({ message: "no webhook for this account" })]);
+
+    global.fetch = originalFetch;
+    assert.equal(called, false);
 });

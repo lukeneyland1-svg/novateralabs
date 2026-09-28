@@ -17,5 +17,8 @@ router.post("/packages", requireApiKey, ingestController.reportPackages);
 router.get("/cve-findings/mine", requireAuth, requireSubscription, ingestController.getMyCveFindings);
 router.get("/key", requireAuth, requireSubscription, ingestController.getApiKey);
 router.post("/key/regenerate", requireAuth, requireSubscription, ingestController.regenerateApiKey);
+router.get("/webhook", requireAuth, requireSubscription, ingestController.getWebhookUrl);
+router.post("/webhook", requireAuth, requireSubscription, ingestController.setWebhookUrl);
+router.post("/webhook/test", requireAuth, requireSubscription, ingestController.testWebhook);
 
 module.exports = router;
