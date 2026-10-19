@@ -1,6 +1,8 @@
 const cron = require("node-cron");
 const { CronExpressionParser } = require("cron-parser");
+const path = require("path");
 const db = require("./db");
+const { backupDatabase } = require("./services/dbBackup");
 
 const scheduledJobs = new Map(); // taskId -> node-cron job instance
 
@@ -29,6 +31,10 @@ async function executeTask(task) {
                 result = `FAILED — status ${res.status}`;
                 status = "failed";
             }
+        } else if (task.type === "backup") {
+            const { file, sizeMb } = await backupDatabase();
+            result = `Backed up database (${sizeMb} MB) to ${path.basename(file)}`;
+            status = "success";
         } else {
             // "log" type — safe, purely demonstrative, but genuinely executes on schedule.
             result = `Executed successfully at ${new Date().toISOString()}`;

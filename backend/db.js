@@ -203,13 +203,22 @@ for (const task of db.prepare("SELECT id, schedule FROM automation_tasks").all()
   }
 }
 
+// "Nightly Backup" used to be a demo "log" task that backed nothing up.
+// Make the owner's one a real backup (deliberately owner-only and not
+// selectable when creating tasks: it copies the whole server's database).
+db.prepare(`
+  UPDATE automation_tasks SET type = 'backup'
+  WHERE name = 'Nightly Backup' AND type = 'log'
+    AND user_id = (SELECT id FROM users WHERE is_owner = 1)
+`).run();
+
 const taskCount = db.prepare("SELECT COUNT(*) AS c FROM automation_tasks").get().c;
 if (taskCount === 0) {
   const seed = db.prepare(`
     INSERT INTO automation_tasks (name, schedule, type, status, last_run, next_run)
     VALUES (?, ?, ?, ?, ?, ?)
   `);
-  seed.run("Nightly Backup", "0 2 * * *", "log", "Idle", "—", "—");
+  seed.run("Nightly Backup", "0 2 * * *", "backup", "Idle", "—", "—");
   seed.run("Site Health Check", "*/15 * * * *", "health_check", "Idle", "—", "—");
 }
 

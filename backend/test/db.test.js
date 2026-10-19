@@ -20,7 +20,7 @@ test("seeds two default automation tasks on a fresh database", () => {
 
     assert.equal(rows.length, 2);
     assert.deepEqual(rows.map((r) => r.name), ["Nightly Backup", "Site Health Check"]);
-    assert.deepEqual(rows.map((r) => r.type), ["log", "health_check"]);
+    assert.deepEqual(rows.map((r) => r.type), ["backup", "health_check"]);
 });
 
 test("automation_tasks rows have the columns added by the migration", () => {
