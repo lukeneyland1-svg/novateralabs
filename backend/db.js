@@ -2,6 +2,7 @@ const path = require("path");
 const crypto = require("crypto");
 const Database = require("better-sqlite3");
 const bcrypt = require("bcryptjs");
+const { legacyScheduleToCron } = require("./legacySchedule");
 
 const DB_PATH = process.env.NOVATERALABS_DB_PATH || path.join(__dirname, "data", "novateralabs.db");
 const db = new Database(DB_PATH);
@@ -191,6 +192,16 @@ for (const user of db.prepare("SELECT id FROM users WHERE api_key IS NULL").all(
 // user account exists on a brand-new install) to that owner.
 db.prepare("UPDATE users SET is_owner = 1 WHERE id = (SELECT MIN(id) FROM users) AND is_owner = 0").run();
 db.prepare("UPDATE automation_tasks SET user_id = (SELECT MIN(id) FROM users) WHERE user_id IS NULL").run();
+
+// Convert any human-readable schedules left over from before validation
+// existed into real cron expressions (idempotent — valid cron strings don't
+// match the legacy patterns, so this is a no-op once converted).
+for (const task of db.prepare("SELECT id, schedule FROM automation_tasks").all()) {
+  const converted = legacyScheduleToCron(task.schedule);
+  if (converted) {
+    db.prepare("UPDATE automation_tasks SET schedule = ? WHERE id = ?").run(converted, task.id);
+  }
+}
 
 const taskCount = db.prepare("SELECT COUNT(*) AS c FROM automation_tasks").get().c;
 if (taskCount === 0) {

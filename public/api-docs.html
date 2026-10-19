@@ -39,6 +39,7 @@
       <pre class="log-output">curl https://novateralabs.com/api/v1/metrics \
   -H "X-API-Key: your-api-key-here"</pre>
       <p class="prose" style="margin-top:12px;">A missing or invalid key returns <code>401</code>. An account without an active subscription returns <code>402</code> (the owner's own key is always exempt).</p>
+      <p class="prose" style="margin-top:12px;">Each account can make up to <strong>60 requests per minute</strong>. Every response includes <code>RateLimit-Limit</code>, <code>RateLimit-Remaining</code> and <code>RateLimit-Reset</code> (seconds until the window resets) headers. Going over returns <code>429</code> with a <code>Retry-After</code> header.</p>
     </div>
 
     <section class="panel">

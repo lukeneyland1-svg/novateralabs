@@ -24,3 +24,6 @@ backend/cd/
 .DS_Store
 *.log
 npm-debug.log*
+
+# Claude Code session data and worktrees
+.claude/
