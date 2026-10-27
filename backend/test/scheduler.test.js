@@ -55,17 +55,54 @@ test("executeTask runs a 'backup' task: writes a real, openable copy of the data
     copy.close();
 });
 
-test("backups keep only the newest KEEP copies", async () => {
-    const { backupDatabase, KEEP } = require("../services/dbBackup");
+function backupName(date) {
+    return `novateralabs-${date.toISOString().replace(/[:.]/g, "-")}.db`;
+}
+
+function emptyBackupDir() {
     const dir = process.env.NOVATERALABS_BACKUP_DIR;
-    // Older-dated fakes sort first, so they're the ones that get pruned.
-    for (let i = 0; i < KEEP + 2; i++) fs.writeFileSync(path.join(dir, `novateralabs-2000-01-0${i}.db`), "");
+    for (const f of fs.readdirSync(dir)) fs.rmSync(path.join(dir, f));
+    return dir;
+}
+
+const DAY = 24 * 60 * 60 * 1000;
+
+test("backups older than KEEP_DAYS are pruned, newer ones and unrelated files are kept", async () => {
+    const { backupDatabase, KEEP_DAYS } = require("../services/dbBackup");
+    const dir = emptyBackupDir();
+    const old = backupName(new Date(Date.now() - (KEEP_DAYS + 1) * DAY));
+    const recent = backupName(new Date(Date.now() - (KEEP_DAYS - 1) * DAY));
+    fs.writeFileSync(path.join(dir, old), "");
+    fs.writeFileSync(path.join(dir, recent), "");
     fs.writeFileSync(path.join(dir, "unrelated.txt"), "keep me");
 
-    await backupDatabase();
+    const { file, removed } = await backupDatabase();
+
+    assert.equal(removed, 1);
+    assert.ok(!fs.existsSync(path.join(dir, old)));
+    assert.ok(fs.existsSync(path.join(dir, recent)));
+    assert.ok(fs.existsSync(file));
+    assert.ok(fs.existsSync(path.join(dir, "unrelated.txt")));
+});
+
+test("catchUpMissedBackups runs a backup task whose last scheduled run has no backup", async () => {
+    const dir = emptyBackupDir();
+    fs.writeFileSync(path.join(dir, backupName(new Date(Date.now() - 2 * DAY))), "");
+    const task = db.prepare("SELECT * FROM automation_tasks WHERE type = 'backup'").get();
+
+    await scheduler.catchUpMissedBackups([{ ...task, schedule: "0 2 * * *" }]);
 
     const backups = fs.readdirSync(dir).filter((f) => f.startsWith("novateralabs-"));
-    assert.equal(backups.length, KEEP);
-    assert.ok(backups.some((f) => !f.startsWith("novateralabs-2000")));
-    assert.ok(fs.existsSync(path.join(dir, "unrelated.txt")));
+    assert.equal(backups.length, 2);
+    assert.equal(db.prepare("SELECT status FROM automation_tasks WHERE id = ?").get(task.id).status, "success");
+});
+
+test("catchUpMissedBackups does nothing when a backup already covers the last scheduled run", async () => {
+    const dir = emptyBackupDir();
+    fs.writeFileSync(path.join(dir, backupName(new Date())), "");
+    const task = db.prepare("SELECT * FROM automation_tasks WHERE type = 'backup'").get();
+
+    await scheduler.catchUpMissedBackups([{ ...task, schedule: "0 2 * * *" }, { id: 0, type: "log", schedule: "* * * * *" }]);
+
+    assert.equal(fs.readdirSync(dir).length, 1);
 });

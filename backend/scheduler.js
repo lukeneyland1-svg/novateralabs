@@ -2,7 +2,7 @@ const cron = require("node-cron");
 const { CronExpressionParser } = require("cron-parser");
 const path = require("path");
 const db = require("./db");
-const { backupDatabase } = require("./services/dbBackup");
+const { backupDatabase, latestBackupTime } = require("./services/dbBackup");
 
 const scheduledJobs = new Map(); // taskId -> node-cron job instance
 
@@ -77,6 +77,26 @@ function scheduleTask(task) {
     return true;
 }
 
+// node-cron doesn't run jobs whose time passed while the process was down,
+// so a reboot over the 02:00 slot used to silently skip that night's backup.
+// On startup, run any backup task whose most recent scheduled time has no
+// backup on disk after it.
+async function catchUpMissedBackups(tasks) {
+    for (const task of tasks) {
+        if (task.type !== "backup") continue;
+        let lastDue;
+        try {
+            lastDue = CronExpressionParser.parse(task.schedule).prev().toDate();
+        } catch (e) {
+            continue;
+        }
+        const latest = latestBackupTime();
+        if (latest && latest >= lastDue) continue;
+        console.log(`[scheduler] "${task.name}" missed its ${lastDue.toISOString()} run — running it now`);
+        await executeTask(task);
+    }
+}
+
 function loadAndScheduleAll() {
     const tasks = db.prepare("SELECT * FROM automation_tasks").all();
     let scheduledCount = 0;
@@ -84,6 +104,7 @@ function loadAndScheduleAll() {
         if (scheduleTask(task)) scheduledCount++;
     }
     console.log(`[scheduler] Scheduled ${scheduledCount} of ${tasks.length} automation tasks`);
+    return catchUpMissedBackups(tasks.filter((t) => cron.validate(t.schedule)));
 }
 
-module.exports = { loadAndScheduleAll, scheduleTask, executeTask };
+module.exports = { loadAndScheduleAll, scheduleTask, executeTask, catchUpMissedBackups };
