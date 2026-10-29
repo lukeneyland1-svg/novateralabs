@@ -17,14 +17,15 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
   const password = document.getElementById('password').value;
   const errorBox = document.getElementById('loginError');
   try {
+    const turnstileToken = await Turnstile.token(e.target);
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ username, password, turnstileToken }),
     });
     const data = await res.json();
-    // 429 = too many attempts; show the server's "try again in N minutes".
-    if (res.status === 429) throw new Error(data.error);
+    // 429 = too many attempts, 403 = bot check failed; show the server's message.
+    if (res.status === 429 || res.status === 403) throw new Error(data.error);
     if (!res.ok) throw new Error('Invalid username or password.');
     if (data.mfaRequired) {
       document.getElementById('loginForm').style.display = 'none';
@@ -37,6 +38,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
     // Our own messages are plain Errors; network/JSON failures are TypeError/SyntaxError.
     errorBox.textContent = err.name === 'Error' ? err.message : 'Something went wrong. Please try again.';
     errorBox.style.display = 'block';
+    Turnstile.reset(e.target);
   }
 });
 

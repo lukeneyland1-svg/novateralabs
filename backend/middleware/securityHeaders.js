@@ -13,17 +13,23 @@ const helmet = require("helmet");
 //    the automatic-injection setup (not a manually added snippet), the
 //    beacon reports back to this site's own /cdn-cgi/rum path, which
 //    connect-src 'self' already covers — only script-src needs the addition.
+// 3. Cloudflare Turnstile (the bot check on login, contact, breach check and
+//    forgot-password) loads its script from challenges.cloudflare.com and
+//    runs the challenge in an iframe from the same host, so it's allowed in
+//    both script-src and frame-src. Its result is posted back to our own
+//    API, so connect-src stays 'self'.
 // Everything else (images, fetches) really is same-origin; Stripe Checkout
 // is a full top-level page navigation, not an iframe or embed.
 // style-src keeps 'unsafe-inline' since the pages use plenty of inline
 // style="..." attributes; unlike inline <script>, inline styles can't execute
 // arbitrary JS, so this is a standard, low-risk allowance — script-src has no
-// such exception beyond the two explicit hosts above.
+// such exception beyond the explicit hosts above.
 module.exports = helmet({
     contentSecurityPolicy: {
         directives: {
             defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "https://static.cloudflareinsights.com"],
+            scriptSrc: ["'self'", "https://static.cloudflareinsights.com", "https://challenges.cloudflare.com"],
+            frameSrc: ["https://challenges.cloudflare.com"],
             styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
             imgSrc: ["'self'"],
             fontSrc: ["'self'", "https://fonts.gstatic.com"],

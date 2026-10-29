@@ -78,3 +78,13 @@ test("allows Cloudflare's auto-injected Web Analytics beacon", async () => {
         assert.match(csp, /script-src[^;]*https:\/\/static\.cloudflareinsights\.com/);
     });
 });
+
+test("allows Cloudflare Turnstile's script and challenge iframe, and nothing else framed", async () => {
+    await withTestServer(async (port) => {
+        const res = await fetch(`http://localhost:${port}/test`);
+        const csp = res.headers.get("content-security-policy");
+
+        assert.match(csp, /script-src[^;]*https:\/\/challenges\.cloudflare\.com/);
+        assert.match(csp, /frame-src https:\/\/challenges\.cloudflare\.com(;|$)/);
+    });
+});

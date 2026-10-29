@@ -4,12 +4,13 @@ const authController = require("../../controllers/authController");
 const mfaController = require("../../controllers/mfaController");
 const requireAuth = require("../../middleware/requireAuth");
 const rateLimitIp = require("../../middleware/rateLimitIp");
+const requireTurnstile = require("../../middleware/requireTurnstile");
 
-router.post("/login", rateLimitIp.login, authController.login);
+router.post("/login", rateLimitIp.login, requireTurnstile, authController.login);
 router.post("/login/verify-mfa", rateLimitIp.mfa, authController.verifyMfaLogin);
 router.post("/logout", authController.logout);
 router.get("/session", authController.checkSession);
-router.post("/forgot-password", rateLimitIp.forgotPassword, authController.requestPasswordReset);
+router.post("/forgot-password", rateLimitIp.forgotPassword, requireTurnstile, authController.requestPasswordReset);
 router.post("/reset-password", rateLimitIp.resetPassword, authController.resetPassword);
 
 router.post("/mfa/setup", requireAuth, mfaController.setupMfa);

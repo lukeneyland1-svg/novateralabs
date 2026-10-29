@@ -82,6 +82,12 @@ app.get(['/.well-known/security.txt', '/security.txt'], (req, res) => {
 // keep the old copy. The agent script is downloaded and curl'd onto servers
 // by its bare URL, so it stays on the default caching.
 const LONG_CACHE_EXCLUDE = new Set(['novateralabs-agent.js']);
+// The public Turnstile site key, for public/turnstile.js. null while no
+// widget is configured, which tells the pages to skip the bot check.
+app.get('/api/turnstile/config', (req, res) => {
+  res.json({ siteKey: process.env.TURNSTILE_SITE_KEY || null });
+});
+
 app.use(express.static(path.join(__dirname, '..', 'public'), {
   setHeaders(res, filePath) {
     if (/\.(css|js)$/.test(filePath) && !LONG_CACHE_EXCLUDE.has(path.basename(filePath))) {

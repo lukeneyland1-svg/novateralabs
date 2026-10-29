@@ -19,10 +19,11 @@ document.getElementById('breachForm').addEventListener('submit', async (e) => {
   resultBox.style.display = 'none';
 
   try {
+    const turnstileToken = await Turnstile.token(e.target);
     const res = await fetch('/api/breach-check', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, turnstileToken }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Something went wrong.');
@@ -53,6 +54,7 @@ document.getElementById('breachForm').addEventListener('submit', async (e) => {
     resultBox.replaceChildren(el('p', { style: 'color:var(--crit);font-size:14px;', text: err.message }));
     resultBox.style.display = 'block';
   } finally {
+    Turnstile.reset(e.target);
     btn.disabled = false;
     btn.textContent = 'Check now';
   }

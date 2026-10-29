@@ -16,6 +16,7 @@ document.getElementById('contactForm').addEventListener('submit', async (e) => {
   status.style.display = 'none';
 
   try {
+    payload.turnstileToken = await Turnstile.token(form);
     const res = await fetch('/api/contact', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -33,6 +34,7 @@ document.getElementById('contactForm').addEventListener('submit', async (e) => {
     status.style.color = 'var(--crit)';
     status.style.display = 'block';
   } finally {
+    Turnstile.reset(form);
     btn.disabled = false;
     btn.textContent = 'Send message';
   }
