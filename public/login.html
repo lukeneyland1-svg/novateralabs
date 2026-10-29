@@ -15,7 +15,7 @@
       <button type="button" id="loginCancelBtn" aria-label="Cancel and go back" style="background:none;border:none;color:var(--text-dim);font-size:22px;line-height:1;cursor:pointer;padding:0 0 0 12px;">×</button>
     </div>
     <p style="color:var(--text-muted);font-size:13.5px;margin:-8px 0 20px;">Sign in to view the dashboard.</p>
-    <form id="loginForm">
+    <form id="loginForm" method="post">
       <label style="display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);margin-bottom:14px;">
         Username
         <input type="text" id="username" required style="display:block;width:100%;margin-top:7px;background:var(--panel-alt);border:1px solid var(--line);border-radius:8px;padding:10px 11px;color:var(--text);font-family:'Inter',sans-serif;font-size:13.5px;">
@@ -27,7 +27,7 @@
       <div id="loginError" style="display:none;color:var(--crit);font-size:12px;margin:-8px 0 14px;font-family:'IBM Plex Mono',monospace;"></div>
       <button type="submit" class="btn primary" style="width:100%;justify-content:center;">Sign in</button>
     </form>
-    <form id="mfaForm" style="display:none;">
+    <form id="mfaForm" method="post" style="display:none;">
       <p style="color:var(--text-muted);font-size:13.5px;margin:0 0 16px;">Enter the 6-digit code from your authenticator app, or one of your backup codes.</p>
       <label style="display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);margin-bottom:14px;">
         Code
