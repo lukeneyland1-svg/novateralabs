@@ -23,7 +23,9 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
       body: JSON.stringify({ username, password }),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error('Invalid credentials');
+    // 429 = too many attempts; show the server's "try again in N minutes".
+    if (res.status === 429) throw new Error(data.error);
+    if (!res.ok) throw new Error('Invalid username or password.');
     if (data.mfaRequired) {
       document.getElementById('loginForm').style.display = 'none';
       document.getElementById('mfaForm').style.display = 'block';
@@ -32,7 +34,8 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
     }
     window.location.href = '/dashboard.html';
   } catch (err) {
-    errorBox.textContent = 'Invalid username or password.';
+    // Our own messages are plain Errors; network/JSON failures are TypeError/SyntaxError.
+    errorBox.textContent = err.name === 'Error' ? err.message : 'Something went wrong. Please try again.';
     errorBox.style.display = 'block';
   }
 });
@@ -47,10 +50,12 @@ document.getElementById('mfaForm').addEventListener('submit', async (e) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code }),
     });
-    if (!res.ok) throw new Error('Invalid code');
+    if (res.status === 429) throw new Error((await res.json()).error);
+    if (!res.ok) throw new Error('Invalid code. Please try again.');
     window.location.href = '/dashboard.html';
   } catch (err) {
-    errorBox.textContent = 'Invalid code. Please try again.';
+    // Our own messages are plain Errors; network/JSON failures are TypeError/SyntaxError.
+    errorBox.textContent = err.name === 'Error' ? err.message : 'Something went wrong. Please try again.';
     errorBox.style.display = 'block';
   }
 });
