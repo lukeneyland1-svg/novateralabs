@@ -77,7 +77,18 @@ app.get(['/.well-known/security.txt', '/security.txt'], (req, res) => {
   res.type('text/plain').sendFile(path.join(__dirname, '..', 'public', 'security.txt'));
 });
 
-app.use(express.static(path.join(__dirname, '..', 'public')));
+// CSS and JS are cached for a year. Pages reference them as file.js?v=N, so
+// bump N in the HTML whenever an asset changes or visitors (and Cloudflare)
+// keep the old copy. The agent script is downloaded and curl'd onto servers
+// by its bare URL, so it stays on the default caching.
+const LONG_CACHE_EXCLUDE = new Set(['novateralabs-agent.js']);
+app.use(express.static(path.join(__dirname, '..', 'public'), {
+  setHeaders(res, filePath) {
+    if (/\.(css|js)$/.test(filePath) && !LONG_CACHE_EXCLUDE.has(path.basename(filePath))) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    }
+  },
+}));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/contact', contactRoutes);
