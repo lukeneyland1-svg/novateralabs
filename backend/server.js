@@ -92,6 +92,13 @@ app.use('/api/status', statusRoutes);
 app.use('/api/compliance', complianceRoutes);
 app.use('/api/v1', apiV1Routes);
 
+// Last: anything no route above handled. API callers keep a JSON error;
+// everyone else gets the styled 404 page.
+app.use((req, res) => {
+  if (req.path.startsWith('/api/')) return res.status(404).json({ error: 'Not found' });
+  res.status(404).sendFile(path.join(__dirname, '..', 'public', '404.html'));
+});
+
 scheduler.loadAndScheduleAll();
 statusChecker.start();
 
