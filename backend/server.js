@@ -36,7 +36,10 @@ const app = express();
 // run before we've decided whether this request even gets to stay on HTTP.
 app.use(securityHeaders);
 app.use(enforceHttps);
-app.use(cors({ origin: true, credentials: true }));
+// Only our own site may make credentialed cross-origin requests. Echoing
+// back any Origin with credentials would let any website call the API as a
+// logged-in visitor and read the responses.
+app.use(cors({ origin: 'https://novateralabs.com', credentials: true }));
 
 app.use(session({
   secret: SESSION_SECRET,
