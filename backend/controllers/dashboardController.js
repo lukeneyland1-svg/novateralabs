@@ -29,7 +29,10 @@ exports.getDashboardData = async (req, res) => {
             os: osInfo.distro,
             uptime: (process.uptime() / 60).toFixed(1) + " min",
             cpu_load: cpuLoad.currentLoad,
-            ram_usage: (mem.used / mem.total) * 100,
+            // mem.active, not mem.used: systeminformation's "used" includes
+            // Linux's disk cache, which the kernel hands back on demand, so it
+            // read ~97% on a server that was really about half full.
+            ram_usage: (mem.active / mem.total) * 100,
             battery: "N/A",
             load_avg: os.loadavg()[0],
             cpu_count: os.cpus().length
